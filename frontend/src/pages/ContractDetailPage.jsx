@@ -13,16 +13,47 @@ export default function ContractDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    setLoading(true);
 
-    Promise.all([getContract(id), getRiskSummary(id)])
-      .then(([contractData, summaryData]) => {
-        setContract(contractData);
-        setRiskSummary(summaryData);
-        setError('');
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+    let pollInterval = null;
+
+    const fetchData = (showLoading = false) => {
+      if (showLoading) setLoading(true);
+
+      Promise.all([getContract(id), getRiskSummary(id)])
+        .then(([contractData, summaryData]) => {
+          if (!isMounted) return;
+          setContract(contractData);
+          setRiskSummary(summaryData);
+          setError('');
+
+          const isAnalyzing = contractData.status === 'processing' || contractData.status === 'pending';
+          if (isAnalyzing && !pollInterval) {
+            pollInterval = setInterval(() => fetchData(false), 3000);
+          } else if (!isAnalyzing && pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        })
+        .catch((err) => {
+          if (!isMounted) return;
+          setError(err.message);
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+    };
+
+    fetchData(true);
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [id]);
 
   if (loading) {
@@ -359,14 +390,67 @@ export default function ContractDetailPage() {
     }
   };
 
+  const isAnalyzing = contract?.status === 'processing' || contract?.status === 'pending';
+
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <Link to="/dashboard" className="btn btn-ghost" id="back-to-list">← All Contracts</Link>
-        <button className="btn btn-primary" onClick={handleExportReport} id="btn-export-report">
+        <button 
+          className="btn btn-primary" 
+          onClick={handleExportReport} 
+          id="btn-export-report"
+          disabled={isAnalyzing}
+        >
           📥 Download Analysis Report
         </button>
       </div>
+
+      {isAnalyzing && (
+        <div className="glass-card fade-in" style={{
+          padding: '2rem',
+          textAlign: 'center',
+          marginBottom: '2rem',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(59, 130, 246, 0.05))',
+        }}>
+          <div className="spinner" style={{ width: '2.5rem', height: '2.5rem', margin: '0 auto 1.5rem' }} />
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981', marginBottom: '0.5rem' }}>
+            AI Contract Intelligence Running...
+          </h2>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto 1.5rem', fontSize: '0.95rem' }}>
+            We are extracting contract clauses and performing multi-agent risk analysis (IP ownership, Indian law compliance, and liability audits). This updates in real-time.
+          </p>
+          <div style={{
+            width: '100%',
+            maxWidth: '400px',
+            height: '6px',
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            borderRadius: '3px',
+            margin: '0 auto',
+            overflow: 'hidden',
+            position: 'relative'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              backgroundColor: '#10b981',
+              width: '50%',
+              borderRadius: '3px',
+              animation: 'progress-loading 1.8s infinite ease-in-out'
+            }} />
+          </div>
+          <style>{`
+            @keyframes progress-loading {
+              0% { left: -30%; width: 30%; }
+              50% { left: 40%; width: 40%; }
+              100% { left: 100%; width: 30%; }
+            }
+          `}</style>
+        </div>
+      )}
 
       <ContractSummary contract={contract} riskSummary={riskSummary} />
       <ClauseTable contractId={id} />

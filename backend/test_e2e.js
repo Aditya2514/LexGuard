@@ -156,7 +156,7 @@ async function g4_happyPath(docxBuf) {
   console.log('\n══ GROUP 4: Valid Upload (DOCX) ════════════════════════');
   const MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-  const r1 = await req('POST', '/api/contracts', {
+  const r1 = await req('POST', '/api/contracts?sync=true', {
     body: form({ contractCategory: 'employment' }, { buf: docxBuf, mime: MIME, name: 'employment-contract.docx' }),
   });
   assert('Valid DOCX → 201', r1.status === 201);
@@ -168,7 +168,7 @@ async function g4_happyPath(docxBuf) {
   const id1 = r1.body?.data?.contractId;
 
   // Second upload — different category, same content
-  const r2 = await req('POST', '/api/contracts', {
+  const r2 = await req('POST', '/api/contracts?sync=true', {
     body: form({ contractCategory: 'saas' }, { buf: docxBuf, mime: MIME, name: 'saas-agreement.docx' }),
   });
   assert('Second upload → 201', r2.status === 201);
@@ -191,7 +191,7 @@ async function g5_allCategories(docxBuf) {
   const cats = ['employment', 'saas', 'freelance', 'tos', 'privacy', 'other'];
   const ids = [];
   for (const cat of cats) {
-    const r = await req('POST', '/api/contracts', {
+    const r = await req('POST', '/api/contracts?sync=true', {
       body: form({ contractCategory: cat }, { buf: docxBuf, mime: MIME, name: `${cat}.docx` }),
     });
     assert(`Category "${cat}" → 201`, r.status === 201, `got ${r.status}`);
