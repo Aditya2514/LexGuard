@@ -5,6 +5,7 @@
  * Batches clauses to minimise API calls.
  */
 
+const mongoose = require('mongoose');
 const { callLLM } = require('./aiClient');
 const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
@@ -59,12 +60,14 @@ async function runAgent1ClauseExtractor(clausesBatch) {
     maxTokens: 2048,
   });
 
-  // Validate and sanitise
-  const results = (resp.results || []).map((r) => ({
-    id: r.id,
-    clause_type: CLAUSE_TYPES.includes(r.clause_type) ? r.clause_type : 'other',
-    category_tags: Array.isArray(r.category_tags) ? r.category_tags : [],
-  }));
+  // Validate and sanitise (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
+  const results = (resp.results || [])
+    .filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id))
+    .map((r) => ({
+      id: r.id,
+      clause_type: CLAUSE_TYPES.includes(r.clause_type) ? r.clause_type : 'other',
+      category_tags: Array.isArray(r.category_tags) ? r.category_tags : [],
+    }));
 
   return results;
 }

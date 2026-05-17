@@ -5,6 +5,7 @@
  * possible Indian law references.  Batches clauses to minimise API calls.
  */
 
+const mongoose = require('mongoose');
 const { callLLM } = require('./aiClient');
 const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
@@ -86,14 +87,16 @@ async function runAgent2RiskAnalyst(clausesBatch) {
     maxTokens: 4096,
   });
 
-  // Validate and sanitise each result
-  const results = (resp.results || []).map((r) => ({
-    id: r.id,
-    risk_level: RISK_LEVELS.includes(r.risk_level) ? r.risk_level : 'medium',
-    risk_score: clampScore(r.risk_score),
-    risk_reasons: Array.isArray(r.risk_reasons) ? r.risk_reasons : [],
-    possible_law_references: sanitiseLawRefs(r.possible_law_references),
-  }));
+  // Validate and sanitise each result (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
+  const results = (resp.results || [])
+    .filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id))
+    .map((r) => ({
+      id: r.id,
+      risk_level: RISK_LEVELS.includes(r.risk_level) ? r.risk_level : 'medium',
+      risk_score: clampScore(r.risk_score),
+      risk_reasons: Array.isArray(r.risk_reasons) ? r.risk_reasons : [],
+      possible_law_references: sanitiseLawRefs(r.possible_law_references),
+    }));
 
   return results;
 }
@@ -157,43 +160,43 @@ async function analyseRisksForContract(contractId) {
     risk_level: null,
   }).select('_id rawText clause_type');
 
-  if (clauses.length === 0) return;
-
-  // Build batch items
-  const items = clauses.map((c) => ({
-    id: c._id.toString(),
-    text: c.rawText,
-    clause_type: c.clause_type || 'other',
-  }));
-
-  // Process in batches
-  for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
-    const batch = items.slice(i, i + AGENT_BATCH_SIZE);
-    const results = await runAgent2RiskAnalyst(batch);
-
-    const ops = results.map((r) => ({
-      updateOne: {
-        filter: { _id: r.id },
-        update: {
-          $set: {
-            risk_level: r.risk_level,
-            risk_score: r.risk_score,
-            risk_reasons: r.risk_reasons,
-            possible_law_references: r.possible_law_references,
-          },
-        },
-      },
+  if (clauses.length > 0) {
+    // Build batch items
+    const items = clauses.map((c) => ({
+      id: c._id.toString(),
+      text: c.rawText,
+      clause_type: c.clause_type || 'other',
     }));
 
-    if (ops.length > 0) {
-      await Clause.bulkWrite(ops);
+    // Process in batches
+    for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
+      const batch = items.slice(i, i + AGENT_BATCH_SIZE);
+      const results = await runAgent2RiskAnalyst(batch);
+
+      const ops = results.map((r) => ({
+        updateOne: {
+          filter: { _id: r.id },
+          update: {
+            $set: {
+              risk_level: r.risk_level,
+              risk_score: r.risk_score,
+              risk_reasons: r.risk_reasons,
+              possible_law_references: r.possible_law_references,
+            },
+          },
+        },
+      }));
+
+      if (ops.length > 0) {
+        await Clause.bulkWrite(ops);
+      }
     }
   }
 
   // Compute contract-level risk
   const allClauses = await Clause.find({ contractId }).select('risk_level');
   const levels = allClauses.map((c) => c.risk_level).filter(Boolean);
-  const overallRisk = computeOverallRisk(levels);
+  const overallRisk = levels.length > 0 ? computeOverallRisk(levels) : null;
 
   await Contract.findByIdAndUpdate(contractId, {
     overallRiskLevel: overallRisk,

@@ -30,7 +30,7 @@ const testClauses = [
     userContent: 'classify: hello',
     jsonMode: true,
     temperature: 0.1,
-    maxTokens: 64,
+    maxTokens: 256,
   });
   console.log('  Response:', JSON.stringify(ping));
   console.log('  ✅ callLLM works\n');

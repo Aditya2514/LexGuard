@@ -30,7 +30,7 @@ function getClient() {
  * Extract and parse JSON from an LLM response that may contain:
  * - Pure JSON
  * - Markdown-fenced JSON (```json ... ```)
- * - Prose with embedded JSON object
+ * - Prose with embedded JSON object or array
  */
 function extractJSON(raw) {
   let text = raw.trim();
@@ -48,11 +48,30 @@ function extractJSON(raw) {
     }
   }
 
-  // Strategy 3: Find the first top-level JSON object { ... }
+  // Strategy 3: Find the first top-level JSON object { ... } or array [ ... ]
   const firstBrace = text.indexOf('{');
   const lastBrace = text.lastIndexOf('}');
+  const firstBracket = text.indexOf('[');
+  const lastBracket = text.lastIndexOf(']');
+
+  let start = -1;
+  let end = -1;
+
   if (firstBrace !== -1 && lastBrace > firstBrace) {
-    const candidate = text.substring(firstBrace, lastBrace + 1);
+    if (firstBracket !== -1 && firstBracket < firstBrace && lastBracket > lastBrace) {
+      start = firstBracket;
+      end = lastBracket;
+    } else {
+      start = firstBrace;
+      end = lastBrace;
+    }
+  } else if (firstBracket !== -1 && lastBracket > firstBracket) {
+    start = firstBracket;
+    end = lastBracket;
+  }
+
+  if (start !== -1 && end > start) {
+    const candidate = text.substring(start, end + 1);
     try { return JSON.parse(candidate); } catch { /* continue */ }
   }
 
@@ -83,35 +102,34 @@ async function callLLM({
 } = {}) {
   const client = getClient();
 
-  // Detect if using a thinking model (2.5-flash, etc.)
-  const isThinkingModel = AI_MODEL_NAME.includes('2.5');
+  let activeModel = AI_MODEL_NAME;
 
-  const generationConfig = {
-    temperature,
-    maxOutputTokens: maxTokens,
-  };
-
-  // Thinking models don't support responseMimeType, but non-thinking models do
-  if (jsonMode && !isThinkingModel) {
-    generationConfig.responseMimeType = 'application/json';
-  }
-
-  const modelConfig = {
-    model: AI_MODEL_NAME,
-    systemInstruction: systemPrompt,
-    generationConfig,
-  };
-
-  // For thinking models, set a small thinking budget so output tokens go to actual content
-  if (isThinkingModel) {
-    modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  }
-
-  const model = client.getGenerativeModel(modelConfig);
-
-  // One retry with 2 s backoff for transient errors
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Retries with dynamic backoff for transient errors (up to 3 attempts total)
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      const isThinkingModel = activeModel.includes('2.5');
+      const generationConfig = {
+        temperature,
+        maxOutputTokens: maxTokens,
+      };
+
+      // Thinking models don't support responseMimeType, but non-thinking models do
+      if (jsonMode && !isThinkingModel) {
+        generationConfig.responseMimeType = 'application/json';
+      }
+
+      const modelConfig = {
+        model: activeModel,
+        systemInstruction: systemPrompt,
+        generationConfig,
+      };
+
+      // For thinking models, set a small thinking budget so output tokens go to actual content
+      if (isThinkingModel) {
+        modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
+      const model = client.getGenerativeModel(modelConfig);
       const result = await model.generateContent(userContent);
       const response = result.response;
 
@@ -119,9 +137,10 @@ async function callLLM({
       let text = '';
       try {
         text = response.text();
-      } catch {
-        // Thinking models may not support .text() directly
+      } catch (e) {
+        console.warn('DEBUG response.text() threw:', e.message);
       }
+      console.log('DEBUG response candidates:', JSON.stringify(response.candidates));
 
       if (!text && response.candidates && response.candidates[0]) {
         const parts = response.candidates[0].content?.parts || [];
@@ -137,9 +156,18 @@ async function callLLM({
 
       return extractJSON(text);
     } catch (err) {
-      if (attempt === 0 && isTransient(err)) {
-        console.warn(`⚠️  LLM transient error, retrying in 2 s… (${err.message})`);
-        await sleep(2000);
+      if (attempt < 2 && isTransient(err)) {
+        const isQuota = (err.message || '').toLowerCase().includes('quota');
+        // Fall back from gemini-2.5-flash to gemini-flash-latest if quota exceeded
+        if (isQuota && activeModel === 'gemini-2.5-flash') {
+          console.warn(`⚠️  Gemini 2.5 Flash quota exceeded. Automatically falling back to Gemini Flash Latest (Stable 1.5)...`);
+          activeModel = 'gemini-flash-latest';
+          continue;
+        }
+
+        const delayMs = getRetryDelayMs(err);
+        console.warn(`⚠️  LLM transient error (attempt ${attempt + 1}/3), retrying in ${delayMs / 1000} s… (${err.message})`);
+        await sleep(delayMs);
         continue;
       }
       throw err;
@@ -153,12 +181,26 @@ function isTransient(err) {
   const msg = (err.message || '').toLowerCase();
   return (
     msg.includes('rate limit') ||
+    msg.includes('quota') ||
     msg.includes('503') ||
     msg.includes('500') ||
     msg.includes('overloaded') ||
     msg.includes('deadline') ||
     msg.includes('timeout')
   );
+}
+
+function getRetryDelayMs(err) {
+  const msg = err.message || '';
+  const match = msg.match(/Please retry in ([\d.]+)s/i);
+  if (match) {
+    const sec = parseFloat(match[1]);
+    if (!isNaN(sec) && sec > 0) {
+      // Add a small buffer of 500ms to be safe
+      return Math.min(30000, Math.ceil(sec * 1000) + 500);
+    }
+  }
+  return 2000; // default 2s
 }
 
 function sleep(ms) {
