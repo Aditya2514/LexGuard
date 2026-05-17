@@ -10,6 +10,9 @@ const { extractText } = require('../services/parserService');
 const { splitClauses } = require('../services/clauseSplitter');
 const { classifyClausesForContract } = require('../services/agent1ClauseExtractor');
 const { analyseRisksForContract } = require('../services/agent2RiskAnalyst');
+const { generateUserAdvocateForContract } = require('../services/agent3UserAdvocate');
+const { runComplianceCheckForContract } = require('../services/agent4ComplianceChecker');
+const { computeRiskSummaryForContract } = require('../services/riskSummaryService');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -130,15 +133,31 @@ router.post(
       try {
         await classifyClausesForContract(contract._id);
         await analyseRisksForContract(contract._id);
+        await generateUserAdvocateForContract(contract._id);
+        await runComplianceCheckForContract(contract._id);
       } catch (aiErr) {
         console.error(`⚠️  AI analysis failed for ${contract._id}: ${aiErr.message}`);
         aiStatus = 'partial';
       }
 
-      // 7. Reload contract to get updated overallRiskLevel
+      // 7. Recompute overallRiskLevel from whatever clause data is available
+      //    (handles partial failures where agent2 threw before computing overall risk)
+      const analyzedClauses = await Clause.find({ contractId: contract._id }).select('risk_level');
+      const riskLevels = analyzedClauses.map(c => c.risk_level).filter(Boolean);
+      let computedOverallRisk = null;
+      if (riskLevels.length > 0) {
+        const RISK_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1 };
+        computedOverallRisk = riskLevels.reduce((worst, lvl) =>
+          (RISK_PRIORITY[lvl] || 0) > (RISK_PRIORITY[worst] || 0) ? lvl : worst
+        , riskLevels[0]);
+      }
+
       contract = await Contract.findByIdAndUpdate(
         contract._id,
-        { status: aiStatus },
+        {
+          status: aiStatus,
+          ...(computedOverallRisk && { overallRiskLevel: computedOverallRisk }),
+        },
         { new: true }
       );
 
@@ -232,46 +251,56 @@ router.get(
   })
 );
 
+// ── GET /api/contracts/:id/clauses-detailed ─────────────────────────────────
+// Paginated list of clauses with full detail (for frontend contract detail page).
+
+router.get(
+  '/:id/clauses-detailed',
+  asyncHandler(async (req, res) => {
+    const contract = await Contract.findById(req.params.id).select('_id');
+    if (!contract) throw new ApiError(404, 'Contract not found.');
+
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [clauses, total] = await Promise.all([
+      Clause.find({ contractId: req.params.id })
+        .select(
+          '_id segmentIndex rawText ' +
+          'clause_type category_tags ' +
+          'risk_level risk_score risk_reasons possible_law_references ' +
+          'plain_language_explanation worst_case_scenario negotiation_tip ' +
+          'compliance_risk_level potential_issue_areas human_review_strongly_recommended explanatory_note'
+        )
+        .sort({ segmentIndex: 1 })
+        .skip(skip)
+        .limit(limit),
+      Clause.countDocuments({ contractId: req.params.id }),
+    ]);
+
+    return res.status(200).json(
+      new ApiResponse(200, {
+        clauses,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      }, 'Detailed clauses fetched successfully.')
+    );
+  })
+);
+
 // ── GET /api/contracts/:id/risk-summary ─────────────────────────────────────
 // Aggregated risk breakdown for a contract.
 
 router.get(
   '/:id/risk-summary',
   asyncHandler(async (req, res) => {
-    const contract = await Contract.findById(req.params.id)
-      .select('_id overallRiskLevel totalClauses');
-    if (!contract) throw new ApiError(404, 'Contract not found.');
-
-    const clauses = await Clause.find({ contractId: req.params.id })
-      .select('clause_type risk_level');
-
-    // Risk breakdown counts
-    const riskBreakdown = { low: 0, medium: 0, high: 0, critical: 0 };
-    const byType = {};
-
-    for (const c of clauses) {
-      // Count per risk level
-      if (c.risk_level && riskBreakdown.hasOwnProperty(c.risk_level)) {
-        riskBreakdown[c.risk_level]++;
-      }
-
-      // Count per clause type
-      const ct = c.clause_type || 'other';
-      if (!byType[ct]) byType[ct] = { count: 0, highOrCritical: 0 };
-      byType[ct].count++;
-      if (c.risk_level === 'high' || c.risk_level === 'critical') {
-        byType[ct].highOrCritical++;
-      }
-    }
+    const summary = await computeRiskSummaryForContract(req.params.id);
+    if (!summary) throw new ApiError(404, 'Contract not found.');
 
     return res.status(200).json(
-      new ApiResponse(200, {
-        contractId: contract._id,
-        overallRiskLevel: contract.overallRiskLevel,
-        totalClauses: contract.totalClauses,
-        riskBreakdown,
-        byType,
-      }, 'Risk summary generated.')
+      new ApiResponse(200, summary, 'Risk summary generated.')
     );
   })
 );

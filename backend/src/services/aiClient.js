@@ -80,10 +80,126 @@ function extractJSON(raw) {
   );
 }
 
+// ── Grok xAI Client ─────────────────────────────────────────────────────────
+
+/**
+ * Direct HTTP caller for the xAI Grok API.
+ * Uses native fetch (Node 18+) to ensure zero extra dependencies.
+ */
+async function callGrok({
+  systemPrompt,
+  userContent,
+  jsonMode,
+  temperature,
+  maxTokens,
+}) {
+  const apiKey = process.env.GROK_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROK_API_KEY is not defined in .env — Grok features are unavailable.');
+  }
+
+  const model = process.env.GROK_MODEL_NAME || 'grok-beta';
+
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ],
+    temperature: temperature ?? 0.1,
+    max_tokens: maxTokens,
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetch('https://api.xai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Grok API Error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.choices?.[0]?.message?.content;
+  if (!rawText) {
+    throw new Error('Grok returned an empty response.');
+  }
+
+  return extractJSON(rawText);
+}
+
+// ── Groq Client ─────────────────────────────────────────────────────────────
+
+/**
+ * Direct HTTP caller for the Groq API.
+ * Uses native fetch (Node 18+) to ensure zero extra dependencies.
+ */
+async function callGroq({
+  systemPrompt,
+  userContent,
+  jsonMode,
+  temperature,
+  maxTokens,
+  modelName,
+}) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('GROQ_API_KEY is not defined in .env — Groq features are unavailable.');
+  }
+
+  const model = modelName || process.env.GROQ_MODEL_NAME || 'llama-3.3-70b-versatile';
+
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ],
+    temperature: temperature ?? 0.1,
+    max_tokens: maxTokens,
+  };
+
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Groq API Error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.choices?.[0]?.message?.content;
+  if (!rawText) {
+    throw new Error('Groq returned an empty response.');
+  }
+
+  return extractJSON(rawText);
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /**
  * Call the configured LLM and return a parsed object.
+ * Supporting multi-provider selection and automatic self-healing failover.
  *
  * @param {Object} opts
  * @param {string} opts.systemPrompt  – System-level instruction.
@@ -100,79 +216,110 @@ async function callLLM({
   temperature = 0.1,
   maxTokens = 8192,
 } = {}) {
-  const client = getClient();
+  const primaryProvider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
 
-  let activeModel = AI_MODEL_NAME;
+  const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });
+  const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
+  const tryGrok = () => callGrok({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
+  const tryGemini = async () => {
+    const client = getClient();
+    let activeModel = AI_MODEL_NAME;
 
-  // Retries with dynamic backoff for transient errors (up to 3 attempts total)
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const isThinkingModel = activeModel.includes('2.5');
-      const generationConfig = {
-        temperature,
-        maxOutputTokens: maxTokens,
-      };
-
-      // Thinking models don't support responseMimeType, but non-thinking models do
-      if (jsonMode && !isThinkingModel) {
-        generationConfig.responseMimeType = 'application/json';
-      }
-
-      const modelConfig = {
-        model: activeModel,
-        systemInstruction: systemPrompt,
-        generationConfig,
-      };
-
-      // For thinking models, set a small thinking budget so output tokens go to actual content
-      if (isThinkingModel) {
-        modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
-      }
-
-      const model = client.getGenerativeModel(modelConfig);
-      const result = await model.generateContent(userContent);
-      const response = result.response;
-
-      // Extract text — try .text() first, then dig into candidates
-      let text = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        text = response.text();
-      } catch (e) {
-        console.warn('DEBUG response.text() threw:', e.message);
-      }
-      console.log('DEBUG response candidates:', JSON.stringify(response.candidates));
+        const isThinkingModel = activeModel.includes('2.5');
+        const generationConfig = {
+          temperature,
+          maxOutputTokens: maxTokens,
+        };
 
-      if (!text && response.candidates && response.candidates[0]) {
-        const parts = response.candidates[0].content?.parts || [];
-        // For thinking models, take the last text part (thinking output comes first)
-        for (const part of parts) {
-          if (part.text) text = part.text;
+        if (jsonMode && !isThinkingModel) {
+          generationConfig.responseMimeType = 'application/json';
         }
-      }
 
-      if (!text) {
-        throw new Error('LLM returned an empty response — no text content found.');
-      }
+        const modelConfig = {
+          model: activeModel,
+          systemInstruction: systemPrompt,
+          generationConfig,
+        };
 
-      return extractJSON(text);
-    } catch (err) {
-      if (attempt < 2 && isTransient(err)) {
+        if (isThinkingModel) {
+          modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+        }
+
+        const model = client.getGenerativeModel(modelConfig);
+        const result = await model.generateContent(userContent);
+        const response = result.response;
+
+        let text = '';
+        try {
+          text = response.text();
+        } catch {}
+
+        if (!text && response.candidates && response.candidates[0]) {
+          const parts = response.candidates[0].content?.parts || [];
+          for (const part of parts) {
+            if (part.text) text = part.text;
+          }
+        }
+
+        if (!text) {
+          throw new Error('LLM returned an empty response — no text content found.');
+        }
+
+        return extractJSON(text);
+      } catch (err) {
         const isQuota = (err.message || '').toLowerCase().includes('quota');
-        // Fall back from gemini-2.5-flash to gemini-flash-latest if quota exceeded
-        if (isQuota && activeModel === 'gemini-2.5-flash') {
-          console.warn(`⚠️  Gemini 2.5 Flash quota exceeded. Automatically falling back to Gemini Flash Latest (Stable 1.5)...`);
-          activeModel = 'gemini-flash-latest';
+        if (attempt < 2 && isTransient(err)) {
+          if (isQuota && activeModel === 'gemini-2.5-flash') {
+            console.warn(`⚠️  Gemini 2.5 Flash quota exceeded. Automatically falling back to Gemini Flash Latest (Stable 1.5)...`);
+            activeModel = 'gemini-flash-latest';
+            continue;
+          }
+
+          const delayMs = getRetryDelayMs(err);
+          console.warn(`⚠️  Gemini transient error (attempt ${attempt + 1}/3), retrying in ${delayMs / 1000} s… (${err.message})`);
+          await sleep(delayMs);
           continue;
         }
-
-        const delayMs = getRetryDelayMs(err);
-        console.warn(`⚠️  LLM transient error (attempt ${attempt + 1}/3), retrying in ${delayMs / 1000} s… (${err.message})`);
-        await sleep(delayMs);
-        continue;
+        throw err;
       }
-      throw err;
+    }
+  };
+
+  const providers = [];
+  if (primaryProvider === 'groq') {
+    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
+    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+  } else if (primaryProvider === 'grok') {
+    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
+  } else {
+    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
+    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+  }
+
+  const activeProviders = providers.filter(p => p.available);
+  let lastError = null;
+
+  for (const p of activeProviders) {
+    try {
+      console.log(`[aiClient] Calling LLM via provider: ${p.name}`);
+      const res = await p.fn();
+      return res;
+    } catch (err) {
+      console.warn(`⚠️ [aiClient] Provider ${p.name} failed: ${err.message}`);
+      lastError = err;
     }
   }
+
+  throw lastError || new Error('No LLM providers available or all failed.');
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

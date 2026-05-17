@@ -1,0 +1,30 @@
+.risk-badge {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.risk-low {
+  background: var(--risk-low-bg);
+  color: var(--risk-low);
+}
+
+.risk-medium {
+  background: var(--risk-medium-bg);
+  color: var(--risk-medium);
+}
+
+.risk-high {
+  background: var(--risk-high-bg);
+  color: var(--risk-high);
+}
+
+.risk-critical {
+  background: var(--risk-critical-bg);
+  color: var(--risk-critical);
+}
+
+.risk-pending {
+  background: var(--risk-pending-bg);
+  color: var(--risk-pending);
+}

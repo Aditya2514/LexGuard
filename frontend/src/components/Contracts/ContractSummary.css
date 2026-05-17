@@ -1,0 +1,179 @@
+.contract-summary {
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.summary-filename {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+  word-break: break-word;
+}
+
+.summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.meta-category {
+  text-transform: capitalize;
+  font-weight: 500;
+}
+
+.meta-separator {
+  color: var(--text-muted);
+}
+
+.summary-risk-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.risk-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* Risk breakdown cards */
+.risk-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.risk-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  transition: border-color var(--duration) var(--ease);
+}
+
+.risk-count:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.risk-count-number {
+  font-size: var(--font-xl);
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.risk-count-label {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.risk-count-low .risk-count-number { color: var(--risk-low); }
+.risk-count-low { background: var(--risk-low-bg); }
+.risk-count-medium .risk-count-number { color: var(--risk-medium); }
+.risk-count-medium { background: var(--risk-medium-bg); }
+.risk-count-high .risk-count-number { color: var(--risk-high); }
+.risk-count-high { background: var(--risk-high-bg); }
+.risk-count-critical .risk-count-number { color: var(--risk-critical); }
+.risk-count-critical { background: var(--risk-critical-bg); }
+
+.summary-disclaimer {
+  font-size: var(--font-xs);
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Phase 4 Compliance Dashboard Panel ───────────────────────────────── */
+
+.compliance-panel {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: rgba(16, 185, 129, 0.02);
+  border: 1px dashed rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 16px rgba(16, 185, 129, 0.02);
+}
+
+.compliance-panel-title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #10b981;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.compliance-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.compliance-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.compliance-count-number {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.compliance-count-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.compliance-count-low .compliance-count-number { color: #10b981; }
+.compliance-count-low { background: rgba(16, 185, 129, 0.02); border-color: rgba(16, 185, 129, 0.08); }
+.compliance-count-medium .compliance-count-number { color: #f59e0b; }
+.compliance-count-medium { background: rgba(245, 158, 11, 0.02); border-color: rgba(245, 158, 11, 0.08); }
+.compliance-count-high .compliance-count-number { color: #ef4444; }
+.compliance-count-high { background: rgba(239, 68, 68, 0.02); border-color: rgba(239, 68, 68, 0.08); }
+
+.compliance-alert-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-md);
+  color: #ef4444;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
