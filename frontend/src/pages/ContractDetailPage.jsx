@@ -453,7 +453,7 @@ export default function ContractDetailPage() {
       )}
 
       <ContractSummary contract={contract} riskSummary={riskSummary} />
-      <ClauseTable contractId={id} />
+      <ClauseTable contractId={id} contractStatus={contract?.status} />
     </div>
   );
 }

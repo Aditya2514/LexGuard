@@ -6,7 +6,7 @@ import './ClauseTable.css';
 const RISK_OPTIONS = ['all', 'low', 'medium', 'high', 'critical'];
 const COMPLIANCE_OPTIONS = ['all', 'low', 'medium', 'high'];
 
-export default function ClauseTable({ contractId }) {
+export default function ClauseTable({ contractId, contractStatus }) {
   const [clauses, setClauses] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -22,7 +22,7 @@ export default function ClauseTable({ contractId }) {
 
   useEffect(() => {
     if (!contractId) return;
-    setLoading(true);
+    if (clauses.length === 0) setLoading(true);
     getClausesDetailed(contractId, page, limit)
       .then((data) => {
         setClauses(data.clauses || []);
@@ -32,7 +32,7 @@ export default function ClauseTable({ contractId }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [contractId, page]);
+  }, [contractId, page, contractStatus]);
 
   // Collect unique clause types for filter
   const clauseTypes = useMemo(() => {
