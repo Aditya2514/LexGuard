@@ -31,18 +31,26 @@ const clauseSchema = new mongoose.Schema(
     },
 
     // ── Phase 2: Agent 1 – Clause Extractor ──────────────────────────────
+    // NOTE: null is intentional default for all agent fields.
+    // Mongoose enum does not natively support null values, so we use custom validators.
     clause_type: {
       type: String,
-      enum: [...CLAUSE_TYPES, null],
       default: null,
+      validate: {
+        validator: (v) => v === null || CLAUSE_TYPES.includes(v),
+        message: (props) => `"${props.value}" is not a valid clause_type.`,
+      },
     },
     category_tags: { type: [String], default: [] },
 
     // ── Phase 2: Agent 2 – Risk Analyst ──────────────────────────────────
     risk_level: {
       type: String,
-      enum: [...RISK_LEVELS, null],
       default: null,
+      validate: {
+        validator: (v) => v === null || RISK_LEVELS.includes(v),
+        message: (props) => `"${props.value}" is not a valid risk_level.`,
+      },
     },
     risk_score: { type: Number, min: 0, max: 10, default: null },
     risk_reasons: { type: [String], default: [] },
@@ -56,8 +64,11 @@ const clauseSchema = new mongoose.Schema(
     // ── Phase 4: Agent 4 – Indian Compliance Checker ──────────────────────
     compliance_risk_level: {
       type: String,
-      enum: [...COMPLIANCE_RISK_LEVELS, null],
       default: null,
+      validate: {
+        validator: (v) => v === null || COMPLIANCE_RISK_LEVELS.includes(v),
+        message: (props) => `"${props.value}" is not a valid compliance_risk_level.`,
+      },
     },
     potential_issue_areas: { type: [String], default: [] },
     human_review_strongly_recommended: { type: Boolean, default: null },

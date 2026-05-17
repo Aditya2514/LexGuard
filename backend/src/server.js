@@ -49,7 +49,7 @@ app.use((err, _req, res, _next) => {
     });
   }
 
-  // Multer fileFilter rejection (plain Error with statusCode)
+  // Multer fileFilter rejection (plain Error with statusCode set in fileFilter)
   if (err.statusCode && !(err instanceof ApiError)) {
     return res.status(err.statusCode).json({
       success: false,
@@ -66,7 +66,33 @@ app.use((err, _req, res, _next) => {
     });
   }
 
-  // Unknown/unexpected errors
+  // Mongoose: invalid ObjectId format in URL params (e.g. /api/contracts/bad-id)
+  if (err.name === 'CastError') {
+    return res.status(400).json({
+      success: false,
+      message: `Invalid ID format: "${err.value}" is not a valid resource ID.`,
+    });
+  }
+
+  // Mongoose: buffering timed out — DB is unreachable
+  if (err.name === 'MongooseError' && err.message.includes('buffering timed out')) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database is currently unavailable. Please try again shortly.',
+    });
+  }
+
+  // Mongoose validation errors (e.g. required field missing)
+  if (err.name === 'ValidationError') {
+    const messages = Object.values(err.errors).map((e) => e.message);
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed.',
+      errors: messages,
+    });
+  }
+
+  // Unknown/unexpected errors — log stack for debugging, hide details from client
   console.error('Unhandled error:', err);
   return res.status(500).json({
     success: false,

@@ -40,11 +40,16 @@ const contractSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    // Populated in Phase 2+ by Agent 2
+    // Populated in Phase 2+ by Agent 2.
+    // NOTE: null is a valid default — Mongoose enum doesn't support null natively,
+    // so we use a custom validator that passes null through and validates strings.
     overallRiskLevel: {
       type: String,
-      enum: [...RISK_LEVELS, null],
       default: null,
+      validate: {
+        validator: (v) => v === null || RISK_LEVELS.includes(v),
+        message: (props) => `${props.value} is not a valid risk level.`,
+      },
     },
     // Timestamps set by each agent in Phase 2–4
     agentMetadata: {
