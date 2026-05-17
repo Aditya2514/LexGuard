@@ -8,6 +8,8 @@ const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
 const { extractText } = require('../services/parserService');
 const { splitClauses } = require('../services/clauseSplitter');
+const { classifyClausesForContract } = require('../services/agent1ClauseExtractor');
+const { analyseRisksForContract } = require('../services/agent2RiskAnalyst');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
@@ -120,12 +122,25 @@ router.post(
       }));
       await Clause.insertMany(clauseDocs);
 
-      // 5. Mark contract as done
-      contract.status = 'done';
-      await contract.save();
-
-      // 6. Remove temp file
+      // 5. Remove temp file (no longer needed after text extraction)
       deleteTempFile(req.file.path);
+
+      // 6. Run AI agents (graceful degradation on failure)
+      let aiStatus = 'done';
+      try {
+        await classifyClausesForContract(contract._id);
+        await analyseRisksForContract(contract._id);
+      } catch (aiErr) {
+        console.error(`⚠️  AI analysis failed for ${contract._id}: ${aiErr.message}`);
+        aiStatus = 'partial';
+      }
+
+      // 7. Reload contract to get updated overallRiskLevel
+      contract = await Contract.findByIdAndUpdate(
+        contract._id,
+        { status: aiStatus },
+        { new: true }
+      );
 
       return res.status(201).json(
         new ApiResponse(
@@ -135,8 +150,11 @@ router.post(
             fileName: contract.originalFileName,
             clauseCount: clauseSegments.length,
             status: contract.status,
+            overallRiskLevel: contract.overallRiskLevel,
           },
-          'Contract uploaded and processed successfully.'
+          aiStatus === 'done'
+            ? 'Contract uploaded and analysed successfully.'
+            : 'Contract uploaded. AI analysis partially completed — some features may be limited.'
         )
       );
     } catch (err) {
@@ -157,7 +175,7 @@ router.get(
   '/',
   asyncHandler(async (_req, res) => {
     const contracts = await Contract.find()
-      .select('_id originalFileName contractCategory status totalClauses uploadedAt')
+      .select('_id originalFileName contractCategory status totalClauses overallRiskLevel uploadedAt')
       .sort({ uploadedAt: -1 });
 
     return res.status(200).json(
@@ -210,6 +228,50 @@ router.get(
         page,
         pages: Math.ceil(total / limit),
       }, 'Clauses fetched successfully.')
+    );
+  })
+);
+
+// ── GET /api/contracts/:id/risk-summary ─────────────────────────────────────
+// Aggregated risk breakdown for a contract.
+
+router.get(
+  '/:id/risk-summary',
+  asyncHandler(async (req, res) => {
+    const contract = await Contract.findById(req.params.id)
+      .select('_id overallRiskLevel totalClauses');
+    if (!contract) throw new ApiError(404, 'Contract not found.');
+
+    const clauses = await Clause.find({ contractId: req.params.id })
+      .select('clause_type risk_level');
+
+    // Risk breakdown counts
+    const riskBreakdown = { low: 0, medium: 0, high: 0, critical: 0 };
+    const byType = {};
+
+    for (const c of clauses) {
+      // Count per risk level
+      if (c.risk_level && riskBreakdown.hasOwnProperty(c.risk_level)) {
+        riskBreakdown[c.risk_level]++;
+      }
+
+      // Count per clause type
+      const ct = c.clause_type || 'other';
+      if (!byType[ct]) byType[ct] = { count: 0, highOrCritical: 0 };
+      byType[ct].count++;
+      if (c.risk_level === 'high' || c.risk_level === 'critical') {
+        byType[ct].highOrCritical++;
+      }
+    }
+
+    return res.status(200).json(
+      new ApiResponse(200, {
+        contractId: contract._id,
+        overallRiskLevel: contract.overallRiskLevel,
+        totalClauses: contract.totalClauses,
+        riskBreakdown,
+        byType,
+      }, 'Risk summary generated.')
     );
   })
 );

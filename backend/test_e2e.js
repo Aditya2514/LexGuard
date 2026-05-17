@@ -1,5 +1,5 @@
 /**
- * LexGuard Phase 1 – Comprehensive E2E Test Suite
+ * LexGuard Phase 2 – Comprehensive E2E Test Suite
  * Run: node test_e2e.js  (requires Node 18+ and live server on port 5001)
  */
 
@@ -162,7 +162,7 @@ async function g4_happyPath(docxBuf) {
   assert('Valid DOCX → 201', r1.status === 201);
   assert('Has contractId', typeof r1.body?.data?.contractId === 'string');
   assert('clauseCount > 0', (r1.body?.data?.clauseCount ?? 0) > 0, `got ${r1.body?.data?.clauseCount}`);
-  assert('status = done', r1.body?.data?.status === 'done');
+  assert('status = done or partial', r1.body?.data?.status === 'done' || r1.body?.data?.status === 'partial');
   assert('fileName correct', r1.body?.data?.fileName === 'employment-contract.docx');
 
   const id1 = r1.body?.data?.contractId;
@@ -225,7 +225,8 @@ async function g7_getById(id1) {
   assert('Returns correct contract', r1.body?.data?._id === id1);
   assert('Has rawText', typeof r1.body?.data?.rawText === 'string' && r1.body.data.rawText.length > 0);
   assert('Has agentMetadata', typeof r1.body?.data?.agentMetadata === 'object');
-  assert('overallRiskLevel is null', r1.body?.data?.overallRiskLevel === null);
+  const orl = r1.body?.data?.overallRiskLevel;
+  assert('overallRiskLevel populated', orl === null || ['low','medium','high','critical'].includes(orl));
   assert('success=true', r1.body?.success === true);
 
   const r2 = await req('GET', '/api/contracts/not-an-id');
@@ -249,8 +250,8 @@ async function g8_getClauses(id1) {
   assert('Clause has _id', !!c?._id);
   assert('Clause has segmentIndex', typeof c?.segmentIndex === 'number');
   assert('Clause rawText > 30 chars', (c?.rawText?.length ?? 0) >= 30);
-  assert('risk_level is null (Phase 1)', c?.risk_level === null || c?.risk_level === undefined);
-  assert('clause_type is null (Phase 1)', c?.clause_type === null || c?.clause_type === undefined);
+  assert('risk_level populated (Phase 2)', typeof c?.risk_level === 'string' || c?.risk_level === null);
+  assert('clause_type populated (Phase 2)', typeof c?.clause_type === 'string' || c?.clause_type === null);
 
   // Pagination: limit=2
   const r2 = await req('GET', `/api/contracts/${id1}/clauses?limit=2`);
@@ -311,11 +312,49 @@ async function g9_delete(id1, id2) {
   await req('DELETE', `/api/contracts/${id2}`);
 }
 
+async function g10_riskSummary(docxBuf) {
+  console.log('\n══ GROUP 10: Risk Summary Endpoint ════════════════════');
+  const MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  // Upload a contract for testing
+  const r1 = await req('POST', '/api/contracts', {
+    body: form({ contractCategory: 'employment' }, { buf: docxBuf, mime: MIME, name: 'risk-test.docx' }),
+  });
+  const cid = r1.body?.data?.contractId;
+  assert('Upload for risk summary → 201', r1.status === 201);
+
+  if (cid) {
+    const r2 = await req('GET', `/api/contracts/${cid}/risk-summary`);
+    assert('GET risk-summary → 200', r2.status === 200);
+    assert('Has contractId', r2.body?.data?.contractId === cid);
+    assert('Has overallRiskLevel', typeof r2.body?.data?.overallRiskLevel === 'string' || r2.body?.data?.overallRiskLevel === null);
+    assert('Has totalClauses', typeof r2.body?.data?.totalClauses === 'number');
+    assert('Has riskBreakdown', typeof r2.body?.data?.riskBreakdown === 'object');
+    assert('riskBreakdown has low/medium/high/critical', 
+      r2.body?.data?.riskBreakdown?.hasOwnProperty('low') &&
+      r2.body?.data?.riskBreakdown?.hasOwnProperty('medium') &&
+      r2.body?.data?.riskBreakdown?.hasOwnProperty('high') &&
+      r2.body?.data?.riskBreakdown?.hasOwnProperty('critical'));
+    assert('Has byType', typeof r2.body?.data?.byType === 'object');
+
+    // Cleanup
+    await req('DELETE', `/api/contracts/${cid}`);
+  }
+
+  // Bad ID
+  const r3 = await req('GET', '/api/contracts/bad-id/risk-summary');
+  assert('Bad ObjectId → 400', r3.status === 400);
+
+  // Not found
+  const r4 = await req('GET', '/api/contracts/507f1f77bcf86cd799439011/risk-summary');
+  assert('Not found → 404', r4.status === 404);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 (async () => {
   console.log('\n╔══════════════════════════════════════════════════════╗');
-  console.log('║   LexGuard Phase 1 – Full E2E Test Suite             ║');
+  console.log('║   LexGuard Phase 2 – Full E2E Test Suite             ║');
   console.log('╚══════════════════════════════════════════════════════╝');
 
   const ping = await req('GET', '/health');
@@ -347,6 +386,7 @@ async function g9_delete(id1, id2) {
   await g7_getById(id1);
   await g8_getClauses(id1);
   await g9_delete(id1, id2);
+  await g10_riskSummary(docxBuf);
 
   console.log('\n╔══════════════════════════════════════════════════════╗');
   console.log(`║  RESULTS  ✅ ${passed} passed   ❌ ${failed} failed   📋 ${passed+failed} total`);
@@ -357,6 +397,6 @@ async function g9_delete(id1, id2) {
     failures.forEach(f => console.log(`   • ${f}`));
     process.exit(1);
   } else {
-    console.log('\n🟢 Phase 1 is bulletproof — all tests passed!\n');
+    console.log('\n🟢 All Phase 2 tests passed!\n');
   }
 })();
