@@ -101,9 +101,11 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Start Server ──────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 LexGuard API running at http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 LexGuard API running at http://localhost:${PORT}`);
+    console.log(`📋 Health check: http://localhost:${PORT}/health`);
+  });
+}
 
 module.exports = app;
