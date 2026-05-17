@@ -20,7 +20,10 @@ const { CONTRACT_CATEGORIES, MAX_FILE_SIZE_BYTES } = require('../config/constant
 
 // ── Multer Setup ────────────────────────────────────────────────────────────
 
-const uploadsDir = path.join(__dirname, '../../uploads');
+const uploadsDir = process.env.VERCEL
+  ? '/tmp'
+  : path.join(__dirname, '../../uploads');
+
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
