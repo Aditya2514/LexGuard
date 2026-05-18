@@ -138,8 +138,11 @@ router.post(
         try {
           await classifyClausesForContract(contract._id);
           await analyseRisksForContract(contract._id);
-          await generateUserAdvocateForContract(contract._id);
-          await runComplianceCheckForContract(contract._id);
+          // Run Agent 3 and Agent 4 concurrently (both depend on Agent 2 but not on each other)
+          await Promise.all([
+            generateUserAdvocateForContract(contract._id),
+            runComplianceCheckForContract(contract._id),
+          ]);
         } catch (aiErr) {
           console.error(`⚠️  AI analysis failed for ${contract._id}: ${aiErr.message}`);
           aiStatus = 'partial';

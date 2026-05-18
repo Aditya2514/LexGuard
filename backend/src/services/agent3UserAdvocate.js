@@ -116,27 +116,33 @@ async function generateUserAdvocateForContract(contractId) {
       risk_score: c.risk_score ?? 5,
     }));
 
-    // Process in batches
+    // Process batches in parallel concurrently (Intra-agent concurrency)
+    const batchPromises = [];
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
-      const results = await runAgent3UserAdvocate(batch);
-
-      const ops = results.map((r) => ({
-        updateOne: {
-          filter: { _id: r.id },
-          update: {
-            $set: {
-              plain_language_explanation: r.plain_language_explanation,
-              worst_case_scenario: r.worst_case_scenario,
-              negotiation_tip: r.negotiation_tip,
+      const task = async () => {
+        const results = await runAgent3UserAdvocate(batch);
+        return results.map((r) => ({
+          updateOne: {
+            filter: { _id: r.id },
+            update: {
+              $set: {
+                plain_language_explanation: r.plain_language_explanation,
+                worst_case_scenario: r.worst_case_scenario,
+                negotiation_tip: r.negotiation_tip,
+              },
             },
           },
-        },
-      }));
+        }));
+      };
+      batchPromises.push(task());
+    }
 
-      if (ops.length > 0) {
-        await Clause.bulkWrite(ops);
-      }
+    const batchOpsArrays = await Promise.all(batchPromises);
+    const allOps = batchOpsArrays.flat();
+
+    if (allOps.length > 0) {
+      await Clause.bulkWrite(allOps);
     }
 
     // Update contract agent metadata

@@ -1,30 +1,24 @@
-/**
- * Agent 2 – Risk Analyst
- *
- * Evaluates each clause for risk level, score, reasons, and
- * possible Indian law references.  Batches clauses to minimise API calls.
- */
-
 const mongoose = require('mongoose');
 const { callLLM } = require('./aiClient');
 const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
 const { RISK_LEVELS, AGENT_BATCH_SIZE } = require('../config/constants');
 const { LAW_REFERENCES } = require('../config/lawReferences');
+const { retrieveRelevantLaws } = require('./lawRetrieverService');
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `You are a legal risk analysis assistant for contracts focusing on Indian users.
 
-For each clause you receive, evaluate how risky it may be for an individual or small business in India.
+For each clause you receive, you will also see a "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal content retrieved from our database matching this clause. Use this retrieved context to analyze the clause and determine its risk level and score.
 
 For each clause, output:
 - risk_level: one of "low", "medium", "high", "critical".
 - risk_score: integer 0 to 10 (0 = no risk, 10 = extremely risky).
 - risk_reasons: short bullet-style strings explaining the main reasons.
-- possible_law_references: optional list of law hints, each with:
-  - act_key: one of "INDIAN_CONTRACT_ACT", "DPDP_ACT", "ARBITRATION_ACT".
-  - section_hint: SHORT human-readable description (e.g., "restraint of trade provisions", "consent for personal data processing").
+- possible_law_references: optional list of law hints based on the retrieved context, each with:
+  - act_key: the act key matching one of the keys provided in retrieved_legal_context (e.g. "INDIAN_CONTRACT_ACT", "DPDP_ACT", "ARBITRATION_ACT", "IT_ACT", "PATENTS_ACT", "INDUSTRIAL_DISPUTES_ACT", "CONSUMER_PROTECTION_ACT", "PAYMENT_OF_WAGES_ACT", "OTHER").
+  - section_hint: the section number and title (e.g., "Section 27: restraint of trade", "Section 6: consent requirements").
   - reason: why this clause may raise an issue under that Act.
 
 Use a wide risk rubric:
@@ -42,7 +36,7 @@ Use a wide risk rubric:
 IMPORTANT:
 - Use cautious language: say a clause "may be risky", "may be inconsistent with", or "may raise issues under" an Act.
 - Do NOT say a clause "violates" a specific section or is "illegal".
-- Do NOT invent exact section numbers.
+- Quote actual section numbers and act names provided in the retrieved context. Do not invent others.
 
 Output STRICT JSON only with shape:
 
@@ -56,8 +50,8 @@ Output STRICT JSON only with shape:
       "possible_law_references": [
         {
           "act_key": "INDIAN_CONTRACT_ACT",
-          "section_hint": "restraint of trade and reasonableness of non-compete provisions",
-          "reason": "Broad non-compete may be considered unreasonable for Indian employees."
+          "section_hint": "Section 27: Agreement in restraint of trade, void",
+          "reason": "Broad non-compete may be considered unreasonable for Indian employees under restraint of trade rules."
         }
       ]
     }
@@ -73,7 +67,7 @@ const ALLOWED_ACT_KEYS = Object.keys(LAW_REFERENCES);
 /**
  * Send a batch of clauses to the LLM for risk analysis.
  *
- * @param {{ id: string, text: string, clause_type: string }[]} clausesBatch
+ * @param {{ id: string, text: string, clause_type: string, retrieved_legal_context: Array }[]} clausesBatch
  * @returns {Promise<Array>} Parsed and validated results.
  */
 async function runAgent2RiskAnalyst(clausesBatch) {
@@ -161,35 +155,47 @@ async function analyseRisksForContract(contractId) {
   }).select('_id rawText clause_type');
 
   if (clauses.length > 0) {
-    // Build batch items
-    const items = clauses.map((c) => ({
-      id: c._id.toString(),
-      text: c.rawText,
-      clause_type: c.clause_type || 'other',
-    }));
+    // Build batch items by fetching dynamic laws in parallel for each item (Intra-agent concurrency)
+    const items = await Promise.all(
+      clauses.map(async (c) => {
+        const retrieved = await retrieveRelevantLaws(c.rawText, c.clause_type || 'other');
+        return {
+          id: c._id.toString(),
+          text: c.rawText,
+          clause_type: c.clause_type || 'other',
+          retrieved_legal_context: retrieved,
+        };
+      })
+    );
 
-    // Process in batches
+    // Process batches in parallel concurrently (Intra-agent concurrency)
+    const batchPromises = [];
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
-      const results = await runAgent2RiskAnalyst(batch);
-
-      const ops = results.map((r) => ({
-        updateOne: {
-          filter: { _id: r.id },
-          update: {
-            $set: {
-              risk_level: r.risk_level,
-              risk_score: r.risk_score,
-              risk_reasons: r.risk_reasons,
-              possible_law_references: r.possible_law_references,
+      const task = async () => {
+        const results = await runAgent2RiskAnalyst(batch);
+        return results.map((r) => ({
+          updateOne: {
+            filter: { _id: r.id },
+            update: {
+              $set: {
+                risk_level: r.risk_level,
+                risk_score: r.risk_score,
+                risk_reasons: r.risk_reasons,
+                possible_law_references: r.possible_law_references,
+              },
             },
           },
-        },
-      }));
+        }));
+      };
+      batchPromises.push(task());
+    }
 
-      if (ops.length > 0) {
-        await Clause.bulkWrite(ops);
-      }
+    const batchOpsArrays = await Promise.all(batchPromises);
+    const allOps = batchOpsArrays.flat();
+
+    if (allOps.length > 0) {
+      await Clause.bulkWrite(allOps);
     }
   }
 
