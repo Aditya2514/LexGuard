@@ -65,6 +65,26 @@ const LEGAL_PLAYBOOK = {
         referenceUrl:
           'https://www.indiacode.nic.in/bitstream/123456789/1392/1/197039.pdf',
       },
+      {
+        actKey: 'OTHER',
+        actName: 'Indian Copyright Act, 1957',
+        sectionNumber: 'Section 57',
+        title: 'Author\'s special moral rights',
+        content:
+          'Independently of the author\'s copyright and even after the assignment of copyright, the author shall have the right to claim authorship and restrain distortion, mutilation or modification of the work. Moral rights are inalienable under Indian law.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/1367/1/195714.pdf',
+      },
+      {
+        actKey: 'INDIAN_CONTRACT_ACT',
+        actName: 'Indian Contract Act, 1872',
+        sectionNumber: 'Section 27',
+        title: 'Unreasonable restraint of trade (IP life-capture)',
+        content:
+          'A blanket assignment claiming ownership over personal off-duty inventions and unrelated side-projects created on weekends is considered void as an unreasonable restraint of trade under Section 27.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/2187/1/A187209.pdf',
+      }
     ],
   },
 
@@ -145,6 +165,18 @@ const LEGAL_PLAYBOOK = {
         referenceUrl:
           'https://www.indiacode.nic.in/bitstream/123456789/15256/1/consumer_protection_act_2019.pdf',
       },
+      {
+        actKey: 'INDIAN_CONTRACT_ACT',
+        actName: 'Indian Contract Act, 1872',
+        sectionNumber: 'Section 74',
+        title: 'Liquidated damages vs penalty clauses',
+        content:
+          'A party cannot claim contractually specified liquidated damages unless they prove actual injury or financial loss occurred. Automatic compensation penalties (like 200%) without proof of harm are treated as punitive penalty clauses and struck down by courts.',
+        landmark_case:
+          'Fateh Chand v. Balkishan Dass (1963) — Supreme Court established that the courts will not enforce punitive liquidated damage clauses without proof of actual harm or injury.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/2187/1/A187209.pdf',
+      }
     ],
   },
 
@@ -235,6 +267,28 @@ const LEGAL_PLAYBOOK = {
         referenceUrl:
           'https://www.indiacode.nic.in/bitstream/123456789/2154/1/A193604.pdf',
       },
+      {
+        actKey: 'PAYMENT_OF_WAGES_ACT',
+        actName: 'Payment of Wages Act, 1936',
+        sectionNumber: 'Section 7 & 9',
+        title: 'Permissible deductions and withholding restrictions',
+        content:
+          'Employers cannot unilaterally defer earned salaries interest-free or deduct compensation from an employee\'s contracted base salary. Wage deferrals or holding reserves are strictly unauthorized and illegal.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/2154/1/A193604.pdf',
+      },
+      {
+        actKey: 'INDIAN_CONTRACT_ACT',
+        actName: 'Indian Contract Act, 1872',
+        sectionNumber: 'Section 74',
+        title: 'Unenforceable training bonds & administrative markup',
+        content:
+          'Employment bonds or repayment terms are only valid for specialized external training expenses where the employer has spent actual, verifiable money. Arbitrary internal billing rates, onboarding admin fees, or compounding interest on resignation are void as punitive penalties.',
+        landmark_case:
+          'Sicpa India Pvt. Ltd. v. Shri Manas Pratim Baruah (2012) — Delhi High Court established that arbitrary administrative markups and internal training bonds are void penalties if no actual specialised expenses are proved.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/2187/1/A187209.pdf',
+      }
     ],
   },
 
@@ -251,6 +305,18 @@ const LEGAL_PLAYBOOK = {
         referenceUrl:
           'https://www.indiacode.nic.in/bitstream/123456789/2187/1/A187209.pdf',
       },
+      {
+        actKey: 'INDIAN_CONTRACT_ACT',
+        actName: 'Indian Contract Act, 1872',
+        sectionNumber: 'Section 23',
+        title: 'Waiver of statutory labour rights opposing public policy',
+        content:
+          'Statutory worker rights mandated by state Shops and Establishments Acts (e.g. maximum weekly hours, mandatory rest periods, overtime) are based on public welfare. A contractual waiver of these protections is void under Section 23 as opposed to public policy.',
+        landmark_case:
+          'Shops and Establishments Act (e.g. Karnataka Shops & Establishments Act, 1961 / Maharashtra Act, 2017) strictly forbids working beyond statutory maximum limits or waiving mandatory rest leaves.',
+        referenceUrl:
+          'https://www.indiacode.nic.in/bitstream/123456789/2187/1/A187209.pdf',
+      }
     ],
   },
 };

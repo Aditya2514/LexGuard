@@ -13,9 +13,25 @@ async function seedDatabase() {
   }
 
   console.log('🔌 Connecting to MongoDB for seeding...');
+  let connected = false;
   try {
-    await mongoose.connect(uri);
-    console.log('✅ Connected successfully!');
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 4000 });
+    console.log('✅ Connected successfully to Atlas!');
+    connected = true;
+  } catch (err) {
+    console.warn(`⚠️ Primary MongoDB connection failed: ${err.message}`);
+    console.log('🔌 Attempting auto-fallback to local MongoDB on port 27017...');
+    try {
+      await mongoose.connect('mongodb://127.0.0.1:27017/lexguard', { serverSelectionTimeoutMS: 4000 });
+      console.log('✅ Connected successfully to Local Fallback MongoDB!');
+      connected = true;
+    } catch (fallbackErr) {
+      console.error('❌ Both Atlas and Local MongoDB connections failed. Exiting.', fallbackErr);
+      process.exit(1);
+    }
+  }
+
+  try {
 
     // 1. Clean existing sections
     console.log('🧹 Clearing existing LawSection documents...');

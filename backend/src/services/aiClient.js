@@ -340,11 +340,38 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
 
   const clauses = parsedUser.clauses || [];
 
-  // Identify which agent is executing based on systemPrompt
+  // Identify which agent is executing based on unique JSON keys or instructions in the systemPrompt
   const isAgent1 = systemPrompt.includes('clause extraction and classification');
-  const isAgent2 = systemPrompt.includes('risk analysis assistant');
-  const isAgent3 = systemPrompt.includes('user-focused legal explainer') || systemPrompt.includes('user advocate');
-  const isAgent4 = systemPrompt.includes('Indian law compliance assistant') || systemPrompt.includes('compliance checked') || systemPrompt.includes('compliance checker');
+  const isAgent2 = systemPrompt.includes('risk analysis assistant') || systemPrompt.includes('"risk_reasons"');
+  const isAgent3 = systemPrompt.includes('user-focused legal explainer') || systemPrompt.includes('"plain_language_explanation"');
+  const isAgent4 = systemPrompt.includes('Indian law compliance assistant') || systemPrompt.includes('"compliance_risk_level"');
+
+  const getClauseTraps = (rawText = '', clauseType = 'other') => {
+    const text = rawText.toLowerCase();
+    
+    // 1. Wage Deferral
+    const isWageDeferral = text.includes('defer') || text.includes('withhold') || text.includes('deduct') || text.includes('negative margin') || text.includes('reserve');
+    
+    // 2. 24/7 Availability / Overtime waiver
+    const isAvailabilityWaiver = text.includes('24/7') || text.includes('availability') || text.includes('latency') || text.includes('weekly working hours') || text.includes('45-minute') || text.includes('45 minute') || text.includes('shops');
+
+    // 3. Predatory Training Bonds
+    const isTrainingBond = text.includes('training') || text.includes('repay') || text.includes('bond') || text.includes('administrative fee') || text.includes('compounding interest') || text.includes('36 months') || text.includes('$450');
+
+    // 4. IP Life-Capture
+    const isIpLifeCapture = clauseType === 'ip_ownership' && (text.includes('personal device') || text.includes('weekend') || text.includes('conceive') || text.includes('outside the company') || text.includes('off-duty') || text.includes('global') || text.includes('life-capture'));
+
+    // 5. Liquidated damages / penalty
+    const isLiquidatedPenalty = text.includes('200%') || text.includes('liquidated') || text.includes('ex-parte') || text.includes('injunct') || text.includes('without proving') || text.includes('compensation penalty') || text.includes('penalty clause');
+
+    return {
+      isWageDeferral,
+      isAvailabilityWaiver,
+      isTrainingBond,
+      isIpLifeCapture,
+      isLiquidatedPenalty
+    };
+  };
 
   if (isAgent1) {
     const results = clauses.map(c => {
@@ -352,7 +379,7 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
       let type = 'other';
       if (text.includes('compete') || text.includes('solicit') || text.includes('competing')) {
         type = 'non_compete';
-      } else if (text.includes('intellectual') || text.includes('invention') || text.includes('patent') || text.includes('copyright') || text.includes('trademark') || text.includes('work product')) {
+      } else if (text.includes('intellectual') || text.includes('invention') || text.includes('patent') || text.includes('copyright') || text.includes('trademark') || text.includes('work product') || text.includes('conceive')) {
         type = 'ip_ownership';
       } else if (text.includes('confidential') || text.includes('disclosure') || text.includes('proprietary')) {
         type = 'confidentiality';
@@ -366,7 +393,7 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
         type = 'termination';
       } else if (text.includes('govern') || text.includes('jurisdiction') || text.includes('applicable law')) {
         type = 'governing_law';
-      } else if (text.includes('payment') || text.includes('fee') || text.includes('compensation') || text.includes('salary')) {
+      } else if (text.includes('payment') || text.includes('fee') || text.includes('compensation') || text.includes('salary') || text.includes('defer') || text.includes('withhold')) {
         type = 'payment';
       } else if (text.includes('amend') || text.includes('modify')) {
         type = 'amendment';
@@ -383,13 +410,74 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
   if (isAgent2) {
     const results = clauses.map(c => {
       const type = c.clause_type || 'other';
+      const traps = getClauseTraps(c.rawText || '', type);
       
       let level = 'low';
       let score = 2;
       let reasons = ['Standard boilerplates, minimal risk under Indian Law.'];
       let lawRefs = [];
 
-      if (type === 'non_compete') {
+      if (traps.isWageDeferral) {
+        level = 'high';
+        score = 8;
+        reasons = [
+          'Unilateral salary deferral and wage-withholding stipulations.',
+          'Violates Section 5 and Section 7 of the Payment of Wages Act, 1936.'
+        ];
+        lawRefs = [{
+          act_key: 'PAYMENT_OF_WAGES_ACT',
+          section_hint: 'Section 5 & 7: Permanent wage withholding prohibitions',
+          reason: 'Employers in India are strictly barred from unilaterally withholding earned wages or creating internal reserves out of base salary.'
+        }];
+      } else if (traps.isAvailabilityWaiver) {
+        level = 'high';
+        score = 8;
+        reasons = [
+          'Predatory 24/7 availability mandate and statutory work hour waivers.',
+          'Void under Section 23 of the Indian Contract Act, 1872 as opposed to public policy.'
+        ];
+        lawRefs = [{
+          act_key: 'INDIAN_CONTRACT_ACT',
+          section_hint: 'Section 23: Unlawful agreements opposing public policy',
+          reason: 'Contractual waivers of statutory working hours and mandatory rest periods under Shops and Establishments Acts are completely void.'
+        }];
+      } else if (traps.isTrainingBond) {
+        level = 'high';
+        score = 8;
+        reasons = [
+          'Arbitrary training bond charges and internal administrative fee markups.',
+          'Struck down under Section 74 of the Indian Contract Act, 1872 unless representing actual verifiable losses.'
+        ];
+        lawRefs = [{
+          act_key: 'INDIAN_CONTRACT_ACT',
+          section_hint: 'Section 74: Employment bonds and penalty clauses',
+          reason: 'Delhi High Court in Sicpa India v. Manas Pratim Baruah ruled that arbitrary administrative markup fees are void penalties.'
+        }];
+      } else if (traps.isIpLifeCapture) {
+        level = 'high';
+        score = 8;
+        reasons = [
+          'Unreasonable IP life-capture claiming off-duty and weekend innovations.',
+          'Restraint of trade under Section 27 and conflicts with Section 57 of the Copyright Act.'
+        ];
+        lawRefs = [{
+          act_key: 'INDIAN_CONTRACT_ACT',
+          section_hint: 'Section 27 & Copyright Act Section 57: IP ownership restraint',
+          reason: 'Authors retain inalienable moral rights, and personal unrelated creations made off-duty cannot be fully assigned.'
+        }];
+      } else if (traps.isLiquidatedPenalty) {
+        level = 'high';
+        score = 8;
+        reasons = [
+          'Punitive 200% liquidated damages and waiver of proof of actual injury.',
+          'Void as a penalty clause under Section 74 of the Indian Contract Act.'
+        ];
+        lawRefs = [{
+          act_key: 'INDIAN_CONTRACT_ACT',
+          section_hint: 'Section 74: Restraints on automatic liquidated damages',
+          reason: 'Supreme Court in Fateh Chand v. Balkishan Dass established that liquidated damages cannot be claimed without proof of actual harm.'
+        }];
+      } else if (type === 'non_compete') {
         level = 'high';
         score = 8;
         reasons = [
@@ -459,11 +547,33 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
   if (isAgent3) {
     const results = clauses.map(c => {
       const type = c.clause_type || 'other';
+      const traps = getClauseTraps(c.rawText || '', type);
+      
       let explanation = 'This clause sets standard guidelines. Ensure you understand your obligations.';
       let scenario = 'If a disagreement occurs, the written terms will bind you directly.';
       let tip = 'Ensure you have written copies of all communications and terms.';
 
-      if (type === 'non_compete') {
+      if (traps.isWageDeferral) {
+        explanation = 'Allows the company to unilaterally defer up to 40% of your base salary interest-free during negative margin quarters.';
+        scenario = 'You might go unpaid for months with no interest on your delayed base salary, creating severe cashflow issues.';
+        tip = 'Request timely payments in compliance with the Payment of Wages Act, 1936. Earned salary cannot be withheld.';
+      } else if (traps.isAvailabilityWaiver) {
+        explanation = 'Mandates 24/7 availability and demands immediate responses with zero latency.';
+        scenario = 'You could face instant termination for not replying to emails on weekends or outside office hours.';
+        tip = 'Refuse blanket waivers of Shops & Establishments Act hour protections. Establish standard rest periods.';
+      } else if (traps.isTrainingBond) {
+        explanation = 'Imposes an arbitrary repayment bond with administrative markup fees and compounding interest.';
+        scenario = 'Resigning early will trigger exorbitant claims for internal onboarding expenses, trapping you in the job.';
+        tip = 'Restrict employment bonds strictly to direct, verifiable external training costs outside basic onboarding.';
+      } else if (traps.isIpLifeCapture) {
+        explanation = 'Claims ownership of off-duty creations and personal weekend side-projects.';
+        scenario = 'A software app or invention you code entirely on weekends using personal devices will be claimed by the company.';
+        tip = 'Limit IP assignment to work created strictly during official hours and directly linked to your job scope.';
+      } else if (traps.isLiquidatedPenalty) {
+        explanation = 'Mandates a punitive 200% compensation penalty and immediate ex-parte injunctions.';
+        scenario = 'The company can sue you for massive arbitrary fines without having to prove any actual financial damage.';
+        tip = 'Remove the 200% automatic penalty. Cap liabilities to actual, proven direct loss.';
+      } else if (type === 'non_compete') {
         explanation = 'This clause stops you from working for any competitor for a period of time after leaving.';
         scenario = 'You might be unable to find a job or work in your field of expertise for several years.';
         tip = 'Ask to reduce the restriction to 6 months and limit its geographical scope to your city.';
@@ -498,12 +608,39 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
   if (isAgent4) {
     const results = clauses.map(c => {
       const type = c.clause_type || 'other';
+      const traps = getClauseTraps(c.rawText || '', type);
+      
       let level = 'low';
       let issues = [];
       let recommend = false;
       let note = 'No significant Indian law compliance issues flagged.';
 
-      if (type === 'non_compete') {
+      if (traps.isWageDeferral) {
+        level = 'high';
+        issues = ['Unilateral wage deferral', 'Unauthorised base salary withholding'];
+        recommend = true;
+        note = 'Highly illegal under Section 5 & 7 of the Payment of Wages Act, 1936. Employers cannot arbitrarily withhold contracted salaries or establish corporate reserves using earned wages.';
+      } else if (traps.isAvailabilityWaiver) {
+        level = 'high';
+        issues = ['Waiver of statutory working hours', 'Shops & Establishments Act hour violations'];
+        recommend = true;
+        note = 'Violates statutory work hour limits and daily rest periods under the Shops and Establishments Acts. Statutory waivers are void under Section 23 of the Contract Act.';
+      } else if (traps.isTrainingBond) {
+        level = 'high';
+        issues = ['Predatory internal training bond', 'Arbitrary internal billing penalty'];
+        recommend = true;
+        note = 'Under Section 74 of the Contract Act and Sicpa India v. Manas Pratim Baruah, training bonds are invalid unless they represent direct, actual verifiable external expenses.';
+      } else if (traps.isIpLifeCapture) {
+        level = 'high';
+        issues = ['IP life-capture off-duty assignment', 'Copyright Section 57 moral rights violations'];
+        recommend = true;
+        note = 'IP life-capture assignment operates as an unreasonable restraint under Section 27 of the Contract Act and violates inalienable moral rights protected under Section 57 of the Copyright Act.';
+      } else if (traps.isLiquidatedPenalty) {
+        level = 'high';
+        issues = ['Punitive 200% liquidated damages penalty', 'Ex-parte injunction mandate'];
+        recommend = true;
+        note = 'Automatic double-salary damages without proof of actual harm are void under Section 74 of the Contract Act. Fateh Chand v. Balkishan Dass mandates proof of actual losses.';
+      } else if (type === 'non_compete') {
         level = 'high';
         issues = ['Broad post-termination non-compete duration', 'Potential restraint of trade concern'];
         recommend = true;

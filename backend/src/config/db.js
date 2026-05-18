@@ -6,15 +6,23 @@ const connectDB = async () => {
     return;
   }
   try {
+    console.log('🔌 Connecting to MONGODB_URI...');
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000, // fail fast if Atlas is unreachable
+      serverSelectionTimeoutMS: 5000, // fail fast if Atlas is unreachable
     });
-    console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+    console.log(`✅ MongoDB Connected (Atlas): ${conn.connection.host}`);
   } catch (error) {
-    // Log but do NOT call process.exit — let the server stay up so health checks
-    // and non-DB routes remain available. A process manager (PM2 etc.) handles restarts.
-    console.error(`❌ MongoDB connection error: ${error.message}`);
-    console.error('   Server will continue running. DB-dependent routes will return 500.');
+    console.error(`❌ Primary MongoDB (Atlas) connection error: ${error.message}`);
+    console.log('🔌 Attempting auto-fallback to local MongoDB on port 27017...');
+    try {
+      const fallbackConn = await mongoose.connect('mongodb://127.0.0.1:27017/lexguard', {
+        serverSelectionTimeoutMS: 5000,
+      });
+      console.log(`✅ MongoDB Connected (Local Fallback): ${fallbackConn.connection.host}`);
+    } catch (fallbackError) {
+      console.error(`❌ Local MongoDB fallback failed: ${fallbackError.message}`);
+      console.error('   Server will continue running. DB-dependent routes will return 500.');
+    }
   }
 };
 
