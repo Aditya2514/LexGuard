@@ -174,28 +174,43 @@ async function callHuggingFace({
     body.response_format = { type: 'json_object' };
   }
 
-  const res = await fetch(`https://router.huggingface.co/hf-inference/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const url = 'https://router.huggingface.co/v1/chat/completions';
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+  const payload = JSON.stringify(body);
 
-  if (!res.ok) {
-    const errText = await res.text();
-    // Cold start error usually returns 503 with a specific message. We treat it as a normal throw so it gets caught.
-    throw new Error(`Hugging Face API Error (${res.status}): ${errText}`);
+  // Retry up to 2 times for transient DNS/network failures (common on some ISPs)
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: payload });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`Hugging Face API Error (${res.status}): ${errText}`);
+      }
+
+      const data = await res.json();
+      const rawText = data?.choices?.[0]?.message?.content;
+      if (!rawText) {
+        throw new Error('Hugging Face returned an empty response.');
+      }
+
+      return extractJSON(rawText);
+    } catch (err) {
+      lastErr = err;
+      const isNetwork = err.message.includes('fetch failed') || err.message.includes('EAI_AGAIN') || err.message.includes('ENOTFOUND');
+      if (isNetwork && attempt < 3) {
+        console.warn(`⚠️ [HuggingFace] Network error (attempt ${attempt}/3), retrying in 2s…`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      throw lastErr;
+    }
   }
-
-  const data = await res.json();
-  const rawText = data?.choices?.[0]?.message?.content;
-  if (!rawText) {
-    throw new Error('Hugging Face returned an empty response.');
-  }
-
-  return extractJSON(rawText);
+  throw lastErr;
 }
 
 // ── Groq Client ─────────────────────────────────────────────────────────────
