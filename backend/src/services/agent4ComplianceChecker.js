@@ -3,6 +3,7 @@ const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
 const { callLLM } = require('./aiClient');
 const { AGENT_BATCH_SIZE } = require('../config/constants');
+const { retrieveRelevantLaws } = require('./lawRetrieverService');
 
 /**
  * Agent 4 – Indian Compliance Checker
@@ -21,24 +22,21 @@ async function runAgent4ComplianceChecker(clausesBatch) {
   if (validBatch.length === 0) return [];
 
   const systemPrompt = `You are an Indian law compliance assistant, not a lawyer and not a substitute for legal advice.
-You receive clauses from contracts, along with their clause_type, risk_level, and law hints relating to Indian Acts.
-Your job is to highlight potential areas where the clause may raise Indian law compliance concerns, in cautious, non-definitive language.
+You receive clauses from contracts, along with their clause_type, risk_level, and "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal guidelines retrieved from our database.
+Your job is to highlight potential areas where the clause may raise Indian law compliance concerns, specifically referencing the Acts, sections, and landmark cases provided in the retrieved legal context.
 
-Focus on three Acts only:
-- Indian Contract Act, 1872 (fairness, restraint of trade, unconscionable terms, one-sided clauses).
-- Digital Personal Data Protection Act, 2023 (personal data processing, consent, rights of data principals).
-- Arbitration and Conciliation Act, 1996 (fairness and neutrality of arbitration and dispute resolution).
+Focus on the acts provided in the retrieved context (e.g. Indian Contract Act 1872, DPDP Act 2023, Arbitration Act 1996, IT Act 2000, Patents Act 1970, Consumer Protection Act 2019, etc.).
 
 For each clause, output:
 - compliance_risk_level: "low", "medium", or "high".
 - potential_issue_areas: list of short strings, each describing a possible issue area (e.g. "Broad non-compete duration", "Personal data processing without clear consent", "Unilateral appointment of arbitrator").
 - human_review_strongly_recommended: true if a reasonable person might want a qualified Indian lawyer to review this clause; false otherwise.
-- explanatory_note: 1–3 sentences explaining, in plain language, why this clause may raise potential Indian law issues, if any.
+- explanatory_note: 1–3 sentences explaining, in plain language, why this clause may raise potential Indian law issues, using the exact section names and precedents provided in the retrieved legal context.
 
 Rules:
 - Use cautious language like "may raise issues under", "might be considered", "could be inconsistent with".
 - Do not claim that a clause is definitely illegal, void, or unenforceable.
-- Do not include exact section numbers. Use general descriptions like "restraint of trade provisions", "obligations when processing personal data", or "requirements for neutral arbitration".
+- Quote actual section names and acts provided in the retrieved context. Do not invent others.
 - If you see no clear Indian law concern, use compliance_risk_level = "low" and an empty potential_issue_areas array.
 - Keep explanatory_note concise and user-friendly.
 
@@ -63,6 +61,7 @@ Output strict JSON only with shape:
       risk_level: c.risk_level,
       risk_score: c.risk_score,
       possible_law_references: c.possible_law_references,
+      retrieved_legal_context: c.retrieved_legal_context || [],
     })),
   });
 
@@ -113,61 +112,104 @@ async function runComplianceCheckForContract(contractId) {
 
     console.log(`[Agent 4] Option B active: checking ${toCheck.length} risky clauses, skipping ${toSkip.length} low-risk clauses.`);
 
-    // 3. Directly save 'low' compliance risk for skipped clauses
-    for (const clause of toSkip) {
-      clause.compliance_risk_level = 'low';
-      clause.potential_issue_areas = [];
-      clause.human_review_strongly_recommended = false;
-      clause.explanatory_note = 'No significant Indian law compliance issues flagged.';
-      await clause.save();
+    // 3. Directly save 'low' compliance risk for skipped clauses in a single bulk operation
+    if (toSkip.length > 0) {
+      const skipOps = toSkip.map((c) => ({
+        updateOne: {
+          filter: { _id: c._id },
+          update: {
+            $set: {
+              compliance_risk_level: 'low',
+              potential_issue_areas: [],
+              human_review_strongly_recommended: false,
+              explanatory_note: 'No significant Indian law compliance issues flagged.',
+            },
+          },
+        },
+      }));
+      await Clause.bulkWrite(skipOps);
     }
 
-    // 4. Batch & process clauses in 'toCheck' using AGENT_BATCH_SIZE
+    // 4. Fetch relevant laws dynamically for all checked clauses in parallel (Intra-agent concurrency)
+    const inputs = await Promise.all(
+      toCheck.map(async (c) => {
+        const retrieved = await retrieveRelevantLaws(c.rawText, c.clause_type || 'other');
+        return {
+          id: c._id.toString(),
+          text: c.rawText,
+          clause_type: c.clause_type || 'other',
+          risk_level: c.risk_level || 'low',
+          risk_score: c.risk_score || 0,
+          possible_law_references: c.possible_law_references || [],
+          retrieved_legal_context: retrieved,
+        };
+      })
+    );
+
+    // 5. Batch & process clauses in 'inputs' in parallel concurrently (Intra-agent concurrency)
     const batchSize = AGENT_BATCH_SIZE || 15;
-    for (let i = 0; i < toCheck.length; i += batchSize) {
-      const slice = toCheck.slice(i, i + batchSize);
-      
-      const inputs = slice.map((c) => ({
-        id: c._id.toString(),
-        text: c.rawText,
-        clause_type: c.clause_type || 'other',
-        risk_level: c.risk_level || 'low',
-        risk_score: c.risk_score || 0,
-        possible_law_references: c.possible_law_references || [],
-      }));
+    const batchPromises = [];
 
-      console.log(`[Agent 4] Batching clauses ${i + 1} to ${Math.min(toCheck.length, i + batchSize)}...`);
-      const results = await runAgent4ComplianceChecker(inputs);
+    for (let i = 0; i < inputs.length; i += batchSize) {
+      const slice = inputs.slice(i, i + batchSize);
+      const task = async () => {
+        const results = await runAgent4ComplianceChecker(slice);
 
-      // Create lookup map of output results by ID
-      const resultsMap = {};
-      if (Array.isArray(results)) {
-        for (const res of results) {
-          if (res && res.id) {
-            resultsMap[res.id] = res;
+        // Create lookup map of output results by ID
+        const resultsMap = {};
+        if (Array.isArray(results)) {
+          for (const res of results) {
+            if (res && res.id) {
+              resultsMap[res.id] = res;
+            }
           }
         }
-      }
 
-      // Update documents in the database
-      for (const clause of slice) {
-        const match = resultsMap[clause._id.toString()];
-        if (match) {
-          clause.compliance_risk_level = match.compliance_risk_level || 'low';
-          clause.potential_issue_areas = Array.isArray(match.potential_issue_areas)
-            ? match.potential_issue_areas
-            : [];
-          clause.human_review_strongly_recommended = !!match.human_review_strongly_recommended;
-          clause.explanatory_note = match.explanatory_note || 'Compliance check completed.';
-        } else {
-          // Fallback defaults on missing matching items
-          clause.compliance_risk_level = 'low';
-          clause.potential_issue_areas = [];
-          clause.human_review_strongly_recommended = false;
-          clause.explanatory_note = 'Compliance check processed.';
-        }
-        await clause.save();
-      }
+        // Build bulk update operations
+        return slice.map((inp) => {
+          const match = resultsMap[inp.id];
+          let level = 'low';
+          let issueAreas = [];
+          let recommend = false;
+          let note = 'Compliance check processed.';
+
+          if (match) {
+            level = (match.compliance_risk_level || 'low').toLowerCase().trim();
+            if (level === 'critical') {
+              level = 'high';
+            } else if (!['low', 'medium', 'high'].includes(level)) {
+              level = 'medium'; // safe fallback default
+            }
+            issueAreas = Array.isArray(match.potential_issue_areas)
+              ? match.potential_issue_areas
+              : [];
+            recommend = !!match.human_review_strongly_recommended;
+            note = match.explanatory_note || 'Compliance check completed.';
+          }
+
+          return {
+            updateOne: {
+              filter: { _id: inp.id },
+              update: {
+                $set: {
+                  compliance_risk_level: level,
+                  potential_issue_areas: issueAreas,
+                  human_review_strongly_recommended: recommend,
+                  explanatory_note: note,
+                },
+              },
+            },
+          };
+        });
+      };
+      batchPromises.push(task());
+    }
+
+    const batchOpsArrays = await Promise.all(batchPromises);
+    const allOps = batchOpsArrays.flat();
+
+    if (allOps.length > 0) {
+      await Clause.bulkWrite(allOps);
     }
 
     // 5. Update Contract compliance checked metadata
