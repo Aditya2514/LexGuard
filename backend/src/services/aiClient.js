@@ -137,6 +137,67 @@ async function callGrok({
   return extractJSON(rawText);
 }
 
+// ── Hugging Face Serverless Client ──────────────────────────────────────────
+
+/**
+ * Direct HTTP caller for Hugging Face Inference API.
+ */
+async function callHuggingFace({
+  systemPrompt,
+  userContent,
+  jsonMode,
+  temperature,
+  maxTokens,
+  modelName,
+}) {
+  const apiKey = process.env.HUGGINGFACE_API_KEY;
+  if (!apiKey) {
+    throw new Error('HUGGINGFACE_API_KEY is not defined in .env — Hugging Face features are unavailable.');
+  }
+
+  // Use Qwen 2.5 7B Instruct as the robust default for HF Inference API
+  const model = modelName || process.env.HUGGINGFACE_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
+    ],
+    temperature: temperature ?? 0.1,
+    max_tokens: maxTokens,
+  };
+
+  // HF free API doesn't fully support response_format globally yet, but we will pass it just in case
+  // Qwen handles JSON fine if we tell it to via system prompt.
+  if (jsonMode) {
+    body.response_format = { type: 'json_object' };
+  }
+
+  const res = await fetch(`https://router.huggingface.co/hf-inference/v1/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    // Cold start error usually returns 503 with a specific message. We treat it as a normal throw so it gets caught.
+    throw new Error(`Hugging Face API Error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.choices?.[0]?.message?.content;
+  if (!rawText) {
+    throw new Error('Hugging Face returned an empty response.');
+  }
+
+  return extractJSON(rawText);
+}
+
 // ── Groq Client ─────────────────────────────────────────────────────────────
 
 /**
@@ -221,6 +282,7 @@ async function callLLM({
   const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });
   const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
   const tryGrok = () => callGrok({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
+  const tryHuggingFace = () => callHuggingFace({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
   const tryGemini = async () => {
     const client = getClient();
     let activeModel = AI_MODEL_NAME;
@@ -291,11 +353,11 @@ async function callLLM({
   if (primaryProvider === 'groq') {
     providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
     providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY });
+    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
     providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
-    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
-  } else if (primaryProvider === 'grok') {
-    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
-    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+  } else if (primaryProvider === 'huggingface') {
+    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY });
     providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
     providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
   } else {
