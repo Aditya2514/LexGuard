@@ -381,6 +381,24 @@ function testPostProcessIntegration() {
   ).trim();
   assert('Scenario: retrenchment hallucination purged from reason text', !cleaned.includes('retrenchment of workmen'));
   assert('Scenario: legitimate reason text preserved after purge', cleaned.includes('restricts public speech'));
+
+  // Scenario 8: Strict Presence - Recitals Defang
+  const recitalText = 'this employment agreement witnesseth that the parties hereinafter referred to as...';
+  const hasRecitals = recitalText.includes('this employment agreement') && recitalText.includes('witnesseth') && recitalText.includes('hereinafter referred to as');
+  const hasWaiver = recitalText.includes('waive') || recitalText.includes('forfeit');
+  assert('Scenario: standard recitals → safe harbor triggers', hasRecitals && !hasWaiver);
+
+  // Scenario 9: Strict Presence - Overtime Compliance
+  const overtimeText = 'standard working hours conforming to shops and establishments framework. extra time compensated with overtime wages.';
+  const hasHours = overtimeText.includes('standard working hours') && overtimeText.includes('shops and establishments framework');
+  const hasPay = overtimeText.includes('compensated with overtime wages');
+  assert('Scenario: compliant overtime → safe harbor triggers', hasHours && hasPay);
+
+  // Scenario 10: Prevent Citation Cross-Contamination
+  const codeText = 'the senior software engineer shall write code.';
+  const isEngineer = codeText.includes('senior software engineer');
+  const hasArb = codeText.includes('arbitrator');
+  assert('Scenario: engineer duty block → arbitration leaks blocked', isEngineer && !hasArb);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
