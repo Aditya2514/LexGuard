@@ -7,7 +7,7 @@ const contractRoutes = require('./routes/contractRoutes');
 const ApiError = require('./utils/ApiError');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 7860;
 
 // ── Database ─────────────────────────────────────────────────────────────────
 connectDB();
