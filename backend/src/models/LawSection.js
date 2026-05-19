@@ -29,6 +29,10 @@ const lawSectionSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  embedding: {
+    type: [Number],
+    default: [],
+  },
 }, {
   timestamps: true,
 });

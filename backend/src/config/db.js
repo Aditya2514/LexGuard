@@ -8,7 +8,8 @@ const connectDB = async () => {
   try {
     console.log('🔌 Connecting to MONGODB_URI...');
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // fail fast if Atlas is unreachable
+      serverSelectionTimeoutMS: 3000, // fail fast if Atlas is unreachable
+      connectTimeoutMS: 3000,
     });
     console.log(`✅ MongoDB Connected (Atlas): ${conn.connection.host}`);
   } catch (error) {
@@ -16,7 +17,8 @@ const connectDB = async () => {
     console.log('🔌 Attempting auto-fallback to local MongoDB on port 27017...');
     try {
       const fallbackConn = await mongoose.connect('mongodb://127.0.0.1:27017/lexguard', {
-        serverSelectionTimeoutMS: 5000,
+        serverSelectionTimeoutMS: 3000,
+        connectTimeoutMS: 3000,
       });
       console.log(`✅ MongoDB Connected (Local Fallback): ${fallbackConn.connection.host}`);
     } catch (fallbackError) {

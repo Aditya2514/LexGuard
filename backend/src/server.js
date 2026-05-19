@@ -105,6 +105,10 @@ if (!process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`🚀 LexGuard API running at http://localhost:${PORT}`);
     console.log(`📋 Health check: http://localhost:${PORT}/health`);
+    
+    // Start background job queue processor
+    const jobQueueService = require('./services/jobQueueService');
+    jobQueueService.startQueueWorker();
   });
 }
 
