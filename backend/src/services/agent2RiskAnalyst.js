@@ -73,6 +73,7 @@ You must reply with valid JSON only, with this structure:
 - Persona Filtering: If the document is identified as an Employment Agreement or Contract of Service, completely disable references to B2C frameworks like the Consumer Protection Act, 2019.
 - Strict Boilerplate Isolation: Do NOT output boilerplate phrases (like "training bonds") unless you can extract a direct text fragment showing that explicit mechanism within the evaluated clause boundaries.
 - Heightened IP Parsing Specificity: Flag any instance where a statutory section number is explicitly mentioned inside contract wording (such as "Section 19(4)") to double-check that you map that exact law in the final authority box.
+- Dynamic Citation Subtitles: When citing a specific statutory section, do not append a hardcoded label description to the section number. Dynamic subtitle generation must be used based on the exact violation pattern observed (e.g., use 'Section 74 - Wage Forfeiture Penalty Matrix' instead of defaulting to a standard 'training bond' string label if the text handles escrow credits).
 `;
 
 // ── Allowed act_keys ─────────────────────────────────────────────────────────
