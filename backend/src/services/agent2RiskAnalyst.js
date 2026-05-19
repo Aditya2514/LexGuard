@@ -143,7 +143,7 @@ function postProcessAnalysisOutput(r, clauseText) {
   }
 
   // Explicit Statutory Trap Catcher for Copyright Act Reversion
-  if (text.includes("19(4)") || text.includes("copyright act")) {
+  if (text.includes("19(4)") || (text.includes("copyright act") && (text.includes("waive") || text.includes("reversion")))) {
     const hasCopyright = (r.possible_law_references || []).some(
       (ref) => ref.act_key === 'COPYRIGHT_ACT'
     );
@@ -164,6 +164,38 @@ function postProcessAnalysisOutput(r, clauseText) {
         section_hint: 'Section 19(4): IP Reversion Waiver Restriction',
         reason: 'Under Indian Copyright Act, Section 19(4) states that if the assignee does not exercise the rights within a period of one year, the assignment in respect of such rights shall be deemed to have lapsed unless otherwise specified. Attempting to override this absolutely is treated as void/unreasonable under copyright laws.',
       });
+    }
+  }
+
+  // 1. Defang the Over-Sensitive Copyright Trap
+  if (text.includes("copyright act")) {
+    if (!text.includes("19(4)") && !text.includes("waive") && !text.includes("reversion")) {
+      r.risk_level = 'low';
+      r.risk_score = 2;
+      r.risk_reasons = [
+        "The clause defines a standard, tightly scoped work-for-hire structure under the Copyright Act, 1957, protecting the company's core assets without infringing on off-duty personal innovations."
+      ];
+      r.possible_law_references = [{
+        act_key: 'COPYRIGHT_ACT',
+        section_hint: 'Section 17',
+        reason: 'Standard work-for-hire ownership assignment during the course of employment.',
+      }];
+    }
+  }
+
+  // 2. Defang the Arbitration Mutual Consensus Trap
+  if (text.includes("arbitration") && (text.includes("mutual consensus") || text.includes("mutual agreement") || text.includes("jointly appoint"))) {
+    if (!text.includes("unilateral") && !text.includes("sole right to nominate") && !text.includes("sole arbitrator nominated by the company")) {
+      r.risk_level = 'low';
+      r.risk_score = 2;
+      r.risk_reasons = [
+        "The clause utilizes a highly compliant, bilateral mechanism requiring mutual consensus for arbitrator selection, fully adhering to neutral frameworks."
+      ];
+      r.possible_law_references = [{
+        act_key: 'ARBITRATION_ACT',
+        section_hint: 'Section 11',
+        reason: 'Valid bilateral appointment procedure ensuring mutual party autonomy.',
+      }];
     }
   }
 

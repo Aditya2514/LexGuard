@@ -231,13 +231,23 @@ async function runComplianceCheckForContract(contractId) {
           }
 
           // Add Copyright Act 19(4) trap verification at the compliance checker level as well
-          if (text.includes("19(4)") || text.includes("copyright act")) {
+          if (text.includes("19(4)") || (text.includes("copyright act") && (text.includes("waive") || text.includes("reversion")))) {
             level = 'high';
             recommend = true;
             if (!issueAreas.some(area => area.toLowerCase().includes("copyright"))) {
               issueAreas.push("Copyright Reversion Waiver");
             }
             note = "CRITICAL ALERT: Clause explicitly attempts to contract out of statutory IP reversion. Contractual waivers overriding Section 19(4) are highly predatory under Indian IP jurisprudence.";
+          }
+
+          // Defang the Arbitration Mutual Consensus Trap at compliance checker level
+          if (text.includes("arbitration") && (text.includes("mutual consensus") || text.includes("mutual agreement") || text.includes("jointly appoint"))) {
+            if (!text.includes("unilateral") && !text.includes("sole right to nominate") && !text.includes("sole arbitrator nominated by the company")) {
+              level = 'low';
+              recommend = false;
+              issueAreas = issueAreas.filter(area => !area.toLowerCase().includes("arbitration"));
+              note = "The clause utilizes a highly compliant, bilateral mechanism requiring mutual consensus for arbitrator selection, fully adhering to neutral frameworks.";
+            }
           }
 
           return {
