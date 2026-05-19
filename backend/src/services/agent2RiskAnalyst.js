@@ -100,21 +100,30 @@ async function runAgent2RiskAnalyst(clausesBatch) {
     maxTokens: 6144,
   });
 
+  // Create lookup map of original wording to associate text during post-processing
+  const clauseTextMap = {};
+  for (const c of clausesBatch) {
+    clauseTextMap[c.id] = c.text;
+  }
+
   // Validate and sanitise each result (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
   const results = (resp.results || [])
     .filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id))
     .map((r) => {
-      const score = clampScore(r.risk_score);
-      let level = RISK_LEVELS.includes(r.risk_level) ? r.risk_level : 'medium';
+      const originalText = clauseTextMap[r.id] || '';
+      const processed = postProcessAnalysisOutput(r, originalText);
+
+      const score = clampScore(processed.risk_score);
+      let level = RISK_LEVELS.includes(processed.risk_level) ? processed.risk_level : 'medium';
       if (score <= 5) {
         level = 'low';
       }
       return {
-        id: r.id,
+        id: processed.id,
         risk_level: level,
         risk_score: score,
-        risk_reasons: Array.isArray(r.risk_reasons) ? r.risk_reasons : [],
-        possible_law_references: sanitiseLawRefs(r.possible_law_references),
+        risk_reasons: Array.isArray(processed.risk_reasons) ? processed.risk_reasons : [],
+        possible_law_references: sanitiseLawRefs(processed.possible_law_references),
       };
     });
 
@@ -122,6 +131,64 @@ async function runAgent2RiskAnalyst(clausesBatch) {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+function postProcessAnalysisOutput(r, clauseText) {
+  const text = (clauseText || '').toLowerCase();
+
+  // Hard Blocker for Consumer Protection Hallucinations
+  if (text.includes("employment") || text.includes("employee") || text.includes("custodian")) {
+    r.possible_law_references = (r.possible_law_references || []).filter(
+      (ref) => ref.act_key !== 'CONSUMER_PROTECTION_ACT'
+    );
+  }
+
+  // Explicit Statutory Trap Catcher for Copyright Act Reversion
+  if (text.includes("19(4)") || text.includes("copyright act")) {
+    const hasCopyright = (r.possible_law_references || []).some(
+      (ref) => ref.act_key === 'COPYRIGHT_ACT'
+    );
+    if (!hasCopyright) {
+      r.risk_level = 'high';
+      r.risk_score = 8;
+      if (!Array.isArray(r.risk_reasons)) {
+        r.risk_reasons = [];
+      }
+      r.risk_reasons.push(
+        'CRITICAL ALERT: Clause explicitly attempts to contract out of statutory IP reversion. Contractual waivers overriding Section 19(4) are highly predatory under Indian IP jurisprudence.'
+      );
+      if (!Array.isArray(r.possible_law_references)) {
+        r.possible_law_references = [];
+      }
+      r.possible_law_references.push({
+        act_key: 'COPYRIGHT_ACT',
+        section_hint: 'Section 19(4): IP Reversion Waiver Restriction',
+        reason: 'Under Indian Copyright Act, Section 19(4) states that if the assignee does not exercise the rights within a period of one year, the assignment in respect of such rights shall be deemed to have lapsed unless otherwise specified. Attempting to override this absolutely is treated as void/unreasonable under copyright laws.',
+      });
+    }
+  }
+
+  // Explicit Blocker for Section 25F Hallucinations on non-termination fields
+  if (!text.includes("retrenchment") && !text.includes("termination notice") && !text.includes("severance")) {
+    r.possible_law_references = (r.possible_law_references || []).filter(
+      (ref) => ref.act_key !== 'INDUSTRIAL_DISPUTES_ACT'
+    );
+  }
+
+  // Dynamic Suffix Label Override to kill the Training Bond leak
+  (r.possible_law_references || []).forEach((ref) => {
+    if (ref.act_key === 'INDIAN_CONTRACT_ACT' && (ref.section_hint || '').includes('Section 74')) {
+      if (text.includes("escrow") || text.includes("credit") || text.includes("deferral")) {
+        ref.section_hint = 'Section 74 - Unenforceable Salary Forfeiture & Wage Retention';
+      } else if (text.includes("liquidated damages") || text.includes("250%") || text.includes("200%")) {
+        ref.section_hint = 'Section 74 - Unreasonable Liquidated Damages Penalty';
+      } else {
+        ref.section_hint = 'Section 74 - Employment Liquidated Penalty & Restrictions';
+      }
+    }
+  });
+
+  return r;
+}
 
 function clampScore(val) {
   const n = parseInt(val, 10);

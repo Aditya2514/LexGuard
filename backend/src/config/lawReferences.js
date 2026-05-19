@@ -71,6 +71,14 @@ const LAW_REFERENCES = {
     reference_url:
       'https://www.indiacode.nic.in/bitstream/123456789/2154/1/A193604.pdf',
   },
+  COPYRIGHT_ACT: {
+    act_key: 'COPYRIGHT_ACT',
+    act_name: 'Copyright Act, 1957',
+    description:
+      'Governs author rights, assignments, and statutory reversion of intellectual property under Indian law.',
+    reference_url:
+      'https://www.indiacode.nic.in/bitstream/123456789/1367/1/195714.pdf',
+  },
   OTHER: {
     act_key: 'OTHER',
     act_name: 'General Indian Contract & Civic Laws',

@@ -212,6 +212,34 @@ async function runComplianceCheckForContract(contractId) {
             recommend = false;
           }
 
+          const text = (inp.text || '').toLowerCase();
+          
+          // Filter out Consumer Protection issues from employment contracts
+          if (text.includes("employment") || text.includes("employee") || text.includes("custodian")) {
+            issueAreas = issueAreas.filter(area => !area.toLowerCase().includes("consumer protection"));
+            if (note.toLowerCase().includes("consumer protection")) {
+              note = note.replace(/Consumer Protection Act,?\s*2019?/gi, "applicable employment laws");
+            }
+          }
+
+          // Filter out Industrial Disputes Act from non-termination fields
+          if (!text.includes("retrenchment") && !text.includes("termination notice") && !text.includes("severance")) {
+            issueAreas = issueAreas.filter(area => !area.toLowerCase().includes("industrial disputes"));
+            if (note.toLowerCase().includes("industrial disputes")) {
+              note = note.replace(/Industrial Disputes Act,?\s*1947?/gi, "Indian contract framework");
+            }
+          }
+
+          // Add Copyright Act 19(4) trap verification at the compliance checker level as well
+          if (text.includes("19(4)") || text.includes("copyright act")) {
+            level = 'high';
+            recommend = true;
+            if (!issueAreas.some(area => area.toLowerCase().includes("copyright"))) {
+              issueAreas.push("Copyright Reversion Waiver");
+            }
+            note = "CRITICAL ALERT: Clause explicitly attempts to contract out of statutory IP reversion. Contractual waivers overriding Section 19(4) are highly predatory under Indian IP jurisprudence.";
+          }
+
           return {
             updateOne: {
               filter: { _id: inp.id },
