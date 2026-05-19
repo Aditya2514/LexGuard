@@ -207,6 +207,11 @@ async function runComplianceCheckForContract(contractId) {
             note = match.explanatory_note || 'Compliance check completed.';
           }
 
+          if (inp.risk_score <= 5) {
+            level = 'low';
+            recommend = false;
+          }
+
           return {
             updateOne: {
               filter: { _id: inp.id },
