@@ -103,13 +103,20 @@ async function runAgent2RiskAnalyst(clausesBatch) {
   // Validate and sanitise each result (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
   const results = (resp.results || [])
     .filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id))
-    .map((r) => ({
-      id: r.id,
-      risk_level: RISK_LEVELS.includes(r.risk_level) ? r.risk_level : 'medium',
-      risk_score: clampScore(r.risk_score),
-      risk_reasons: Array.isArray(r.risk_reasons) ? r.risk_reasons : [],
-      possible_law_references: sanitiseLawRefs(r.possible_law_references),
-    }));
+    .map((r) => {
+      const score = clampScore(r.risk_score);
+      let level = RISK_LEVELS.includes(r.risk_level) ? r.risk_level : 'medium';
+      if (score <= 5) {
+        level = 'low';
+      }
+      return {
+        id: r.id,
+        risk_level: level,
+        risk_score: score,
+        risk_reasons: Array.isArray(r.risk_reasons) ? r.risk_reasons : [],
+        possible_law_references: sanitiseLawRefs(r.possible_law_references),
+      };
+    });
 
   return results;
 }
