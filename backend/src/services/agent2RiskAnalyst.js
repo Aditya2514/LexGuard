@@ -130,20 +130,61 @@ async function runAgent2RiskAnalyst(clausesBatch) {
   return results;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Safe Harbor Token Dictionaries ───────────────────────────────────────────
+// Flexible regex patterns that catch synonyms and alternative phrasings,
+// preventing false positives when drafters use varied terminology.
+
+const SAFE_CONFIDENTIALITY_TOKENS = [
+  /absolute\s+confidentiality\s+regarding\s+trade\s+secrets/i,
+  /proprietary\s+(and|or)\s+confidential\s+information/i,
+  /maintain\s+(strict\s+)?confidentiality\s+(of|regarding)\s+(all\s+)?(trade\s+secrets|proprietary)/i,
+  /nondisclosure\s+(of\s+)?(proprietary|trade|company)\s+(secrets|information|data)/i,
+];
+
+const SAFE_ARBITRATION_TOKENS = [
+  /mutual\s+(consensus|agreement|consent)\s+(of\s+(both|the)\s+parties)?/i,
+  /jointly\s+appoint(ed)?\s+(a\s+)?(sole\s+)?arbitrator/i,
+  /arbitrator\s+(shall\s+be\s+)?(appointed|selected)\s+(by\s+)?mutual/i,
+  /bilateral\s+(arbitration|appointment|selection)/i,
+];
+
+const PREDATORY_ARBITRATION_TOKENS = [
+  /unilateral(ly)?/i,
+  /sole\s+right\s+to\s+nominate/i,
+  /sole\s+arbitrator\s+nominated\s+by\s+the\s+company/i,
+  /company\s+shall\s+(solely\s+)?appoint/i,
+];
+
+const SAFE_IP_WORK_FOR_HIRE_TOKENS = [
+  /intellectual\s+property\s+created\s+(during|in\s+the\s+course\s+of)/i,
+  /work[\s-]for[\s-]hire/i,
+  /scope\s+of\s+(the\s+)?(employee'?s?\s+)?employment/i,
+  /using\s+company\s+resources/i,
+  /strictly\s+within\s+the\s+assigned\s+scope/i,
+];
+
+const GLOBAL_LOCKOUT_TOKENS = [
+  /global\s+(lockout|restriction|ban)/i,
+  /worldwide\s+(non[\s-]?compete|exclusion|ban)/i,
+  /perpetual\s+(and\s+)?irrevocable\s+(restriction|ban|lockout)/i,
+];
+
+function matchesAny(text, patterns) {
+  return patterns.some(rx => rx.test(text));
+}
 
 function postProcessAnalysisOutput(r, clauseText) {
   const text = (clauseText || '').toLowerCase();
 
   // Hard Blocker for Consumer Protection Hallucinations
-  if (text.includes("employment") || text.includes("employee") || text.includes("custodian")) {
+  if (/employ(ment|ee)|custodian/i.test(text)) {
     r.possible_law_references = (r.possible_law_references || []).filter(
       (ref) => ref.act_key !== 'CONSUMER_PROTECTION_ACT'
     );
   }
 
   // Explicit Statutory Trap Catcher for Copyright Act Reversion
-  if (text.includes("19(4)") || (text.includes("copyright act") && (text.includes("waive") || text.includes("reversion")))) {
+  if (text.includes("19(4)") || (/copyright\s+act/i.test(text) && /waiv(e|er)|reversion/i.test(text))) {
     const hasCopyright = (r.possible_law_references || []).some(
       (ref) => ref.act_key === 'COPYRIGHT_ACT'
     );
@@ -167,9 +208,9 @@ function postProcessAnalysisOutput(r, clauseText) {
     }
   }
 
-  // 1. Defang the Over-Sensitive Copyright Trap
-  if (text.includes("copyright act")) {
-    if (!text.includes("19(4)") && !text.includes("waive") && !text.includes("reversion")) {
+  // Defang the Over-Sensitive Copyright Trap (standard work-for-hire)
+  if (/copyright\s+act/i.test(text)) {
+    if (!text.includes("19(4)") && !/waiv(e|er)/i.test(text) && !/reversion/i.test(text)) {
       r.risk_level = 'low';
       r.risk_score = 2;
       r.risk_reasons = [
@@ -183,9 +224,9 @@ function postProcessAnalysisOutput(r, clauseText) {
     }
   }
 
-  // 2. Defang the Arbitration Mutual Consensus Trap
-  if (text.includes("arbitration") && (text.includes("mutual consensus") || text.includes("mutual agreement") || text.includes("jointly appoint"))) {
-    if (!text.includes("unilateral") && !text.includes("sole right to nominate") && !text.includes("sole arbitrator nominated by the company")) {
+  // Defang the Arbitration Mutual Consensus Trap (flexible token match)
+  if (/arbitration/i.test(text) && matchesAny(text, SAFE_ARBITRATION_TOKENS)) {
+    if (!matchesAny(text, PREDATORY_ARBITRATION_TOKENS)) {
       r.risk_level = 'low';
       r.risk_score = 2;
       r.risk_reasons = [
@@ -200,14 +241,14 @@ function postProcessAnalysisOutput(r, clauseText) {
   }
 
   // Explicit Blocker for Section 25F Hallucinations on non-termination fields
-  if (!text.includes("retrenchment") && !text.includes("termination notice") && !text.includes("severance")) {
+  if (!/retrenchment|termination\s+notice|severance/i.test(text)) {
     r.possible_law_references = (r.possible_law_references || []).filter(
       (ref) => ref.act_key !== 'INDUSTRIAL_DISPUTES_ACT'
     );
   }
 
-  // 1. Clean Contract - Confidentiality & Non-Solicit Text Override
-  if (text.includes("absolute confidentiality regarding trade secrets") && !text.includes("global lockout")) {
+  // Clean Contract - Confidentiality & Non-Solicit Text Override (flexible token match)
+  if (matchesAny(text, SAFE_CONFIDENTIALITY_TOKENS) && !matchesAny(text, GLOBAL_LOCKOUT_TOKENS)) {
     r.risk_level = 'low';
     r.risk_score = 1;
     r.risk_reasons = [
@@ -220,7 +261,7 @@ function postProcessAnalysisOutput(r, clauseText) {
     }];
   }
 
-  // 2. Predatory Contract - Non-Disparagement Text Purge
+  // Predatory Contract - Non-Disparagement Text Purge
   if (Array.isArray(r.risk_reasons)) {
     r.risk_reasons = r.risk_reasons.map(reason => {
       if (typeof reason === 'string' && reason.includes("retrenchment of workmen")) {
@@ -236,9 +277,9 @@ function postProcessAnalysisOutput(r, clauseText) {
   // Dynamic Suffix Label Override to kill the Training Bond leak
   (r.possible_law_references || []).forEach((ref) => {
     if (ref.act_key === 'INDIAN_CONTRACT_ACT' && (ref.section_hint || '').includes('Section 74')) {
-      if (text.includes("escrow") || text.includes("credit") || text.includes("deferral")) {
+      if (/escrow|credit|deferral/i.test(text)) {
         ref.section_hint = 'Section 74 - Unenforceable Salary Forfeiture & Wage Retention';
-      } else if (text.includes("liquidated damages") || text.includes("250%") || text.includes("200%")) {
+      } else if (/liquidated\s+damages|250%|200%/i.test(text)) {
         ref.section_hint = 'Section 74 - Unreasonable Liquidated Damages Penalty';
       } else {
         ref.section_hint = 'Section 74 - Employment Liquidated Penalty & Restrictions';

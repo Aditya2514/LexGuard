@@ -77,4 +77,10 @@ const clauseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// ── Compound Indexes for Production Performance ──────────────────────────────
+// Prevents in-memory sorts on paginated clause queries (contractId + segmentIndex).
+// Enables fast risk-level filtering for dashboard aggregation (contractId + risk_level).
+clauseSchema.index({ contractId: 1, segmentIndex: 1 });
+clauseSchema.index({ contractId: 1, risk_level: 1 });
+
 module.exports = mongoose.model('Clause', clauseSchema);
