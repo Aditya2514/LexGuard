@@ -16,6 +16,7 @@ export default function ContractDetailPage() {
 
     let isMounted = true;
     let pollInterval = null;
+    let consecutiveErrors = 0;
 
     const fetchData = (showLoading = false) => {
       if (showLoading) setLoading(true);
@@ -23,6 +24,7 @@ export default function ContractDetailPage() {
       Promise.all([getContract(id), getRiskSummary(id)])
         .then(([contractData, summaryData]) => {
           if (!isMounted) return;
+          consecutiveErrors = 0; // Reset on success
           setContract(contractData);
           setRiskSummary(summaryData);
           setError('');
@@ -37,6 +39,21 @@ export default function ContractDetailPage() {
         })
         .catch((err) => {
           if (!isMounted) return;
+          
+          // Tolerate transient 502/503 or network ERR_FAILED errors (e.g. Render restarts)
+          const isNetworkOr5xx = !err.status || err.status >= 500;
+          if (isNetworkOr5xx) {
+            consecutiveErrors++;
+            if (consecutiveErrors < 15) {
+              console.warn(`Transient network error (${consecutiveErrors}/15), retrying...`, err.message);
+              // If initial fetch failed on cold start, start polling anyway to recover
+              if (!pollInterval) {
+                pollInterval = setInterval(() => fetchData(false), 3000);
+              }
+              return;
+            }
+          }
+
           setError(err.message);
           if (pollInterval) {
             clearInterval(pollInterval);
