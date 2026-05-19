@@ -142,7 +142,7 @@ const SAFE_CONFIDENTIALITY_TOKENS = [
 ];
 
 const SAFE_ARBITRATION_TOKENS = [
-  /mutual\s+(consensus|agreement|consent)\s+(of\s+(both|the)\s+parties)?/i,
+  /mutual\s+(consensus|agreement|consent)(\s+of\s+(both|the)\s+parties)?/i,
   /jointly\s+appoint(ed)?\s+(a\s+)?(sole\s+)?arbitrator/i,
   /arbitrator\s+(shall\s+be\s+)?(appointed|selected)\s+(by\s+)?mutual/i,
   /bilateral\s+(arbitration|appointment|selection)/i,
