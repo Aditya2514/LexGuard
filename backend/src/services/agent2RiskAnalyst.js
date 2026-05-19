@@ -97,7 +97,7 @@ async function runAgent2RiskAnalyst(clausesBatch) {
     userContent,
     jsonMode: true,
     temperature: 0.2,
-    maxTokens: 4096,
+    maxTokens: 6144,
   });
 
   // Validate and sanitise each result (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
