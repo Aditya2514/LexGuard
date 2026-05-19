@@ -317,7 +317,7 @@ async function g10_riskSummary(docxBuf) {
   const MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
   // Upload a contract for testing
-  const r1 = await req('POST', '/api/contracts', {
+  const r1 = await req('POST', '/api/contracts?sync=true', {
     body: form({ contractCategory: 'employment' }, { buf: docxBuf, mime: MIME, name: 'risk-test.docx' }),
   });
   const cid = r1.body?.data?.contractId;

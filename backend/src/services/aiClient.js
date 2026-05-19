@@ -181,11 +181,24 @@ async function callHuggingFace({
   };
   const payload = JSON.stringify(body);
 
-  // Retry up to 2 times for transient DNS/network failures (common on some ISPs)
   let lastErr;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const res = await fetch(url, { method: 'POST', headers, body: payload });
+
+      if (res.status === 429 || res.status === 503) {
+        let delayMs = Math.pow(2, attempt) * 1500 + Math.random() * 1000;
+        const retryAfter = res.headers.get('retry-after');
+        if (retryAfter) {
+          const sec = parseInt(retryAfter, 10);
+          if (!isNaN(sec) && sec > 0) {
+            delayMs = sec * 1000 + 500;
+          }
+        }
+        console.warn(`⚠️ [HuggingFace] Rate limit/Unavailable (${res.status}) on attempt ${attempt}/3. Retrying in ${delayMs.toFixed(0)}ms...`);
+        await new Promise(r => setTimeout(r, delayMs));
+        continue;
+      }
 
       if (!res.ok) {
         const errText = await res.text();
@@ -292,6 +305,43 @@ async function callLLM({
   temperature = 0.1,
   maxTokens = 8192,
 } = {}) {
+  // Intelligent Token-Aware Automatic Chunking Handler
+  const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4.0);
+  if (estimatedTokens > 3000) {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(userContent);
+    } catch {}
+
+    if (parsed && Array.isArray(parsed.clauses) && parsed.clauses.length > 1) {
+      console.log(`🛡️ [aiClient] Prompt exceeds safe threshold (~${estimatedTokens} tokens). Auto-chunking clauses batch of size ${parsed.clauses.length} into sub-batches...`);
+      
+      const mid = Math.ceil(parsed.clauses.length / 2);
+      const chunk1 = parsed.clauses.slice(0, mid);
+      const chunk2 = parsed.clauses.slice(mid);
+
+      const [res1, res2] = await Promise.all([
+        callLLM({
+          systemPrompt,
+          userContent: JSON.stringify({ ...parsed, clauses: chunk1 }),
+          jsonMode,
+          temperature,
+          maxTokens
+        }),
+        callLLM({
+          systemPrompt,
+          userContent: JSON.stringify({ ...parsed, clauses: chunk2 }),
+          jsonMode,
+          temperature,
+          maxTokens
+        })
+      ]);
+
+      const combinedResults = [...(res1?.results || []), ...(res2?.results || [])];
+      return { results: combinedResults };
+    }
+  }
+
   const primaryProvider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
 
   const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });

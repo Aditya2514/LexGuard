@@ -17,6 +17,8 @@ const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const { CONTRACT_CATEGORIES, MAX_FILE_SIZE_BYTES } = require('../config/constants');
+const jobQueueService = require('../services/jobQueueService');
+const QueueJob = require('../models/QueueJob');
 
 // ── Multer Setup ────────────────────────────────────────────────────────────
 
@@ -131,65 +133,42 @@ router.post(
       // 5. Remove temp file (no longer needed after text extraction)
       deleteTempFile(req.file.path);
 
-      const isSync = process.env.NODE_ENV === 'test' || req.query.sync === 'true';
+      // 6. Enqueue/Process contract job
+      if (req.query.sync === 'true') {
+        console.log(`⚡ Running synchronous analysis for contract: ${contract._id}...`);
+        await jobQueueService.processContractJob(contract._id);
+        
+        // Fetch fully updated contract object
+        const updatedContract = await Contract.findById(contract._id);
 
-      const runAI = async () => {
-        let aiStatus = 'done';
-        try {
-          await classifyClausesForContract(contract._id);
-          await analyseRisksForContract(contract._id);
-          // Run Agent 3 and Agent 4 concurrently (both depend on Agent 2 but not on each other)
-          await Promise.all([
-            generateUserAdvocateForContract(contract._id),
-            runComplianceCheckForContract(contract._id),
-          ]);
-        } catch (aiErr) {
-          console.error(`⚠️  AI analysis failed for ${contract._id}: ${aiErr.message}`);
-          aiStatus = 'partial';
-        }
-
-        // 7. Recompute overallRiskLevel from whatever clause data is available
-        const analyzedClauses = await Clause.find({ contractId: contract._id }).select('risk_level');
-        const riskLevels = analyzedClauses.map(c => c.risk_level).filter(Boolean);
-        let computedOverallRisk = null;
-        if (riskLevels.length > 0) {
-          const RISK_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1 };
-          computedOverallRisk = riskLevels.reduce((worst, lvl) =>
-            (RISK_PRIORITY[lvl] || 0) > (RISK_PRIORITY[worst] || 0) ? lvl : worst
-          , riskLevels[0]);
-        }
-
-        contract = await Contract.findByIdAndUpdate(
-          contract._id,
-          {
-            status: aiStatus,
-            ...(computedOverallRisk && { overallRiskLevel: computedOverallRisk }),
-          },
-          { new: true }
+        return res.status(201).json(
+          new ApiResponse(
+            201,
+            {
+              contractId: updatedContract._id,
+              fileName: updatedContract.originalFileName,
+              clauseCount: updatedContract.totalClauses,
+              status: updatedContract.status,
+              overallRiskLevel: updatedContract.overallRiskLevel,
+            },
+            'Contract uploaded and analyzed synchronously successfully.'
+          )
         );
-      };
-
-      if (isSync) {
-        await runAI();
-      } else {
-        runAI().catch((err) => {
-          console.error(`⚠️  Background AI analysis failed for contract ${contract._id}:`, err);
-        });
       }
 
-      return res.status(201).json(
+      await jobQueueService.enqueueJob(contract._id);
+
+      return res.status(202).json(
         new ApiResponse(
-          201,
+          202,
           {
             contractId: contract._id,
             fileName: contract.originalFileName,
             clauseCount: contract.totalClauses,
-            status: isSync ? contract.status : 'processing',
-            overallRiskLevel: isSync ? contract.overallRiskLevel : null,
+            status: 'queued',
+            overallRiskLevel: null,
           },
-          isSync
-            ? 'Contract uploaded and analyzed successfully.'
-            : 'Contract uploaded successfully. AI analysis is running in the background.'
+          'Contract uploaded successfully. AI analysis is running in the background.'
         )
       );
     } catch (err) {
@@ -228,8 +207,22 @@ router.get(
     const contract = await Contract.findById(req.params.id);
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
+    // Fetch background job details
+    const queueJob = await QueueJob.findOne({ contractId: req.params.id })
+      .select('status progress step error');
+
+    const responseData = {
+      ...contract.toObject(),
+      jobProgress: queueJob ? {
+        status: queueJob.status,
+        progress: queueJob.progress,
+        step: queueJob.step,
+        error: queueJob.error,
+      } : null,
+    };
+
     return res.status(200).json(
-      new ApiResponse(200, contract, 'Contract fetched successfully.')
+      new ApiResponse(200, responseData, 'Contract fetched successfully.')
     );
   })
 );
