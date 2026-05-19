@@ -5,7 +5,7 @@ export default function ContractSummary({ contract, riskSummary }) {
   const breakdown = riskSummary?.riskBreakdown || {};
 
   return (
-    <div className="contract-summary glass-card fade-in" id="contract-summary">
+    <div className={`contract-summary glass-card fade-in risk-border-${contract?.overallRiskLevel || 'low'}`} id="contract-summary">
       <div className="summary-header">
         <div>
           <h1 className="summary-filename">{contract?.originalFileName || 'Contract'}</h1>
