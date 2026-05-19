@@ -1,0 +1,26 @@
+name: Sync Backend to Hugging Face Spaces
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Needs full history for subtree split
+
+      - name: Push Backend Subtree to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          # Split the backend folder into its own branch
+          git subtree split --prefix backend -b hf-deploy
+          
+          # Force push that branch to the Hugging Face Space main branch
+          git push -f https://Adity251105:$HF_TOKEN@huggingface.co/spaces/Adity251105/lexguard-backend hf-deploy:main
