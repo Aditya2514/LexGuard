@@ -4,6 +4,7 @@ const Clause = require('../models/Clause');
 const safeRedis = require('../config/redisClient');
 
 // Import Agent Orchestration pipelines
+const { extractGlobalContextForContract } = require('./agentPreFlight');
 const { classifyClausesForContract } = require('./agent1ClauseExtractor');
 const { analyseRisksForContract } = require('./agent2RiskAnalyst');
 const { generateUserAdvocateForContract } = require('./agent3UserAdvocate');
@@ -41,7 +42,8 @@ async function processContractJob(contractId) {
   
   try {
     // 1. Initial State
-    await updateJobProgress(contractId, 10, 'Initializing agents and fetching clauses');
+    await updateJobProgress(contractId, 5, 'Initializing agents and extracting global context');
+    await extractGlobalContextForContract(contractId);
 
     // 2. Run Agent 1 (Clause Extraction/Classification)
     await updateJobProgress(contractId, 20, 'Classifying contract clauses (Agent 1: Classifier)');

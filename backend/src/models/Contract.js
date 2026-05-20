@@ -3,6 +3,8 @@ const { CONTRACT_CATEGORIES, CONTRACT_STATUSES, RISK_LEVELS } = require('../conf
 
 const agentMetadataSchema = new mongoose.Schema(
   {
+    preFlightExtractedAt: { type: Date, default: null },
+    isPreFlightComplete: { type: Boolean, default: false },
     extractedAt: { type: Date, default: null },
     analysedAt: { type: Date, default: null },
     advocatedAt: { type: Date, default: null },
@@ -39,6 +41,11 @@ const contractSchema = new mongoose.Schema(
     totalClauses: {
       type: Number,
       default: 0,
+    },
+    // V3 Architecture: Dynamic Global Context Payload
+    globalContext: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
     },
     // Populated in Phase 2+ by Agent 2.
     // NOTE: null is a valid default — Mongoose enum doesn't support null natively,

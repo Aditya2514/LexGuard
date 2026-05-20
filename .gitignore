@@ -35,6 +35,24 @@ out/
 # Application Specific
 backend/uploads/*
 !backend/uploads/.gitkeep
-sample_employment.docx
-backend/test_groq_models.js
 
+# Scratch / one-off debug scripts (not for production tracking)
+backend/test_groq_models.js
+backend/scratch_*.js
+backend/finish_contract.js
+backend/verify_clean.js
+backend/test_debug_gemini.js
+backend/test_e2e.js
+
+# Temporary test artifacts (kept locally only)
+backend/test_preflight.js
+backend/test_preflight_deep.js
+backend/test_preflight_extreme_edge_cases.js
+backend/test_preflight_final_gauntlet.js
+
+# V3 Production test suite (tracked in git)
+# backend/test_hardening.js  <-- intentionally tracked
+
+# Coverage / generated reports
+coverage/
+*.lcov

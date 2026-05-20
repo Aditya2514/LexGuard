@@ -89,8 +89,32 @@ const ALLOWED_ACT_KEYS = Object.keys(LAW_REFERENCES);
  * @param {{ id: string, text: string, clause_type: string, retrieved_legal_context: Array }[]} clausesBatch
  * @returns {Promise<Array>} Parsed and validated results.
  */
-async function runAgent2RiskAnalyst(clausesBatch) {
-  const userContent = JSON.stringify({ clauses: clausesBatch });
+async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
+  const formattedBatch = clausesBatch.map((c) => {
+    if (!globalContext) return c;
+    const globalPreamble = `
+======================================================================
+[V3 CRITICAL ARCHITECTURAL RUNTIME CONTEXT - DO NOT BYPASS]
+The following parameters have been extracted from the root header of this document. 
+Utilize these explicit definitions to analyze the semantic intent of the active clause below.
+
+Governing Framework: ${globalContext.metadata?.governingLaw || "Not Explicitly Defined"}
+Corporate Employer: ${globalContext.metadata?.employerName || "Not Explicitly Defined"}
+Target Designation: ${globalContext.metadata?.employeeDesignation || "Not Explicitly Defined"}
+
+Global Definitions Mapping Matrix:
+${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
+======================================================================
+
+[ACTIVE TARGET EVALUATION CLAUSE TEXT]:
+`;
+    return {
+      ...c,
+      text: globalPreamble + c.text
+    };
+  });
+
+  const userContent = JSON.stringify({ clauses: formattedBatch });
 
   const resp = await callLLM({
     systemPrompt: SYSTEM_PROMPT,
@@ -375,6 +399,7 @@ function computeOverallRisk(clauseRiskLevels) {
  * @param {string} contractId
  */
 async function analyseRisksForContract(contractId) {
+  const contract = await Contract.findById(contractId).select('globalContext');
   const clauses = await Clause.find({
     contractId,
     risk_level: null,
@@ -399,7 +424,7 @@ async function analyseRisksForContract(contractId) {
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
       const task = async () => {
-        const results = await runAgent2RiskAnalyst(batch);
+        const results = await runAgent2RiskAnalyst(batch, contract?.globalContext);
         return results.map((r) => ({
           updateOne: {
             filter: { _id: r.id },
