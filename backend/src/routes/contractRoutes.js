@@ -331,6 +331,27 @@ router.get(
   })
 );
 
+// ── POST /api/contracts/:id/chat ───────────────────────────────────────────────
+// Ask Agent 5 questions about a specific contract.
+
+router.post(
+  '/:id/chat',
+  asyncHandler(async (req, res) => {
+    const { message } = req.body;
+    if (!message) throw new ApiError(400, 'Chat message is required.');
+
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!contract) throw new ApiError(404, 'Contract not found.');
+
+    const { chatWithContract } = require('../services/agent5Chat');
+    const reply = await chatWithContract(req.params.id, message);
+
+    return res.status(200).json(
+      new ApiResponse(200, { reply }, 'Chat response generated.')
+    );
+  })
+);
+
 // ── DELETE /api/contracts/:id ───────────────────────────────────────────────
 // Delete a contract and all its clauses.
 
