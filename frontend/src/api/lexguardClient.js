@@ -130,3 +130,11 @@ export async function getRiskSummary(id) {
 export async function getClausesDetailed(id, page = 1, limit = 20) {
   return request(`/contracts/${id}/clauses-detailed?page=${page}&limit=${limit}`);
 }
+
+/** POST /api/contracts/:id/chat */
+export async function chatWithContract(id, message) {
+  return request(`/contracts/${id}/chat`, {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  });
+}

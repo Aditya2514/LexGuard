@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getContract, getRiskSummary, getClausesDetailed } from '../api/lexguardClient';
 import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
+import ContractChatSidebar from '../components/Contracts/ContractChatSidebar';
 
 export default function ContractDetailPage() {
   const { id } = useParams();
@@ -469,8 +470,15 @@ export default function ContractDetailPage() {
         </div>
       )}
 
-      <ContractSummary contract={contract} riskSummary={riskSummary} />
-      <ClauseTable contractId={id} contractStatus={contract?.status} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', alignItems: 'start' }}>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <ContractSummary contract={contract} riskSummary={riskSummary} />
+          <ClauseTable contractId={id} contractStatus={contract?.status} />
+        </div>
+        <div style={{ position: 'sticky', top: '1.5rem', height: 'calc(100vh - 3rem)' }}>
+          <ContractChatSidebar contractId={id} />
+        </div>
+      </div>
     </div>
   );
 }
