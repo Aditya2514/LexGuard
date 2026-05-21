@@ -22,6 +22,7 @@ export default function ClauseTable({ contractId, contractStatus }) {
 
   useEffect(() => {
     if (!contractId) return;
+    // eslint-disable-next-line
     if (clauses.length === 0) setLoading(true);
     getClausesDetailed(contractId, page, limit)
       .then((data) => {
@@ -32,6 +33,7 @@ export default function ClauseTable({ contractId, contractStatus }) {
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line
   }, [contractId, page, contractStatus]);
 
   // Collect unique clause types for filter

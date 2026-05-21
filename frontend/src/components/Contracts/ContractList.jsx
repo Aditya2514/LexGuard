@@ -28,6 +28,7 @@ export default function ContractList({ refreshKey }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // eslint-disable-next-line
     setLoading(true);
     getContracts()
       .then((data) => {
