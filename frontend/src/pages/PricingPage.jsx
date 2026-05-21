@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getProfile, createOrder, verifyPayment } from '../api/lexguardClient';
 
 export default function PricingPage() {
@@ -53,7 +53,7 @@ export default function PricingPage() {
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on('payment.failed', function (response) {
+      rzp.on('payment.failed', function () {
         alert('Payment failed. Please try again.');
       });
       rzp.open();

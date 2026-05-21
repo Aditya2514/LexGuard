@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { 
   PieChart, Pie, Cell, 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  XAxis, YAxis, Tooltip, ResponsiveContainer,
   LineChart, Line
 } from 'recharts';
 

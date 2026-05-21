@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { login } from '../api/lexguardClient';
 
 export default function LoginPage() {
