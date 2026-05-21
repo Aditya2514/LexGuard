@@ -292,10 +292,15 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
               {/* Law references */}
               {clause.possible_law_references?.length > 0 && (
                 <div className="expanded-section">
-                  <h4 className="expanded-label">📜 Indian Law References</h4>
+                  <h4 className="expanded-label">📜 Indian Law References & Precedents</h4>
                   <div className="law-refs">
-                    {clause.possible_law_references.map((ref, i) => (
-                      <div className="law-ref-card" key={i}>
+                    {clause.possible_law_references.map((ref, i) => {
+                      const isPrecedent = ref.act_key === 'CASE_LAW';
+                      return (
+                      <div className={`law-ref-card ${isPrecedent ? 'precedent-card' : ''}`} key={i}>
+                        <div className="law-ref-badge" style={{ marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 'bold', color: isPrecedent ? '#9b59b6' : 'var(--accent-color)' }}>
+                           {isPrecedent ? '🏛️ Supreme Court Precedent' : '📜 Statutory Law'}
+                        </div>
                         <a
                           href={ref.reference_url}
                           target="_blank"
@@ -311,7 +316,7 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                           <p className="law-ref-reason">{ref.reason}</p>
                         )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               )}
