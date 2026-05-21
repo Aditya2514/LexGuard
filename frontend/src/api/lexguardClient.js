@@ -27,7 +27,20 @@ async function request(url, options = {}) {
   }
 
   const res = await fetch(`${BASE}${url}`, { ...options, headers });
-  const body = await res.json();
+  
+  let body;
+  const contentType = res.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    body = await res.json();
+  } else {
+    body = await res.text();
+    // Wrap plain text in a standard error format if it's an error status
+    if (!res.ok) {
+      body = { message: body };
+    } else {
+      body = { data: body };
+    }
+  }
 
   if (!res.ok) {
     const msg = body?.message || `Request failed with status ${res.status}`;

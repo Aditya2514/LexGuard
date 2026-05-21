@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const LawSection = require('../models/LawSection');
 const { LEGAL_PLAYBOOK } = require('../config/legalPlaybook');
+const { queryCaseLaw } = require('./pineconeClient');
 
 // ── In-Memory LRU Cache for Law Retrieval ────────────────────────────────────
 const MAX_CACHE_ENTRIES = 50;
@@ -218,6 +219,25 @@ async function retrieveRelevantLaws(clauseText, clauseType, limit = 2) {
           }));
         }
       }
+
+      // ── NEW: Pinecone Case Law Retrieval ──
+      const caseLawResults = await queryCaseLaw(queryVector, limit);
+      if (caseLawResults.length > 0) {
+        console.log(`[RAG-Retriever] Pinecone returned ${caseLawResults.length} matching case laws.`);
+        
+        const formattedCaseLaws = caseLawResults.map(cl => ({
+          actKey: 'CASE_LAW',
+          actName: `Supreme/High Court Precedent: ${cl.caseName}`,
+          sectionNumber: cl.citation,
+          title: `Held by ${cl.court}`,
+          content: `${cl.summary} \nKey Holdings: ${cl.holdings}`,
+          referenceUrl: cl.referenceUrl || '',
+        }));
+
+        // Merge case laws into the final statutory results
+        finalResults = [...finalResults, ...formattedCaseLaws];
+      }
+      
     }
   } catch (err) {
     console.warn(`⚠️ [RAG-Retriever] Semantic Embedding search failed: ${err.message}. Cascading to Keyword search fallback...`);
@@ -290,4 +310,5 @@ async function retrieveRelevantLaws(clauseText, clauseType, limit = 2) {
 module.exports = {
   retrieveRelevantLaws,
   warmEmbeddingCache,
+  getEmbedding,
 };

@@ -79,6 +79,14 @@ const LAW_REFERENCES = {
     reference_url:
       'https://www.indiacode.nic.in/bitstream/123456789/1367/1/195714.pdf',
   },
+  CASE_LAW: {
+    act_key: 'CASE_LAW',
+    act_name: 'Judicial Precedent (Supreme Court / High Court)',
+    description:
+      'Legally binding decisions set by superior courts that govern the interpretation and application of statutory law.',
+    reference_url:
+      'https://main.sci.gov.in/judgments/',
+  },
   OTHER: {
     act_key: 'OTHER',
     act_name: 'General Indian Contract & Civic Laws',
