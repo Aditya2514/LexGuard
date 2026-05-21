@@ -20,6 +20,8 @@ function formatDate(dateStr) {
   });
 }
 
+import AnalyticsDashboard from './AnalyticsDashboard';
+
 export default function ContractList({ refreshKey }) {
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,7 +61,9 @@ export default function ContractList({ refreshKey }) {
   }
 
   return (
-    <div className="contract-list glass-card fade-in" id="contract-list">
+    <>
+      <AnalyticsDashboard contracts={contracts} />
+      <div className="contract-list glass-card fade-in" id="contract-list">
       <table className="data-table">
         <thead>
           <tr>
@@ -93,5 +97,6 @@ export default function ContractList({ refreshKey }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
