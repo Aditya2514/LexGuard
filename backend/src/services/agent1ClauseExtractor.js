@@ -20,11 +20,20 @@ You receive a list of clauses from a contract. For each clause:
 - Optionally add category_tags that help group the clause (e.g. ["employment", "non_compete"]).
 
 Allowed clause_type values (use exactly these strings):
-"non_compete", "non_solicitation", "ip_ownership", "licensing",
-"confidentiality", "privacy_data", "payment", "termination",
-"liability_limit", "indemnity", "dispute_resolution", "arbitration",
-"governing_law", "auto_renewal", "amendment", "warranty",
-"force_majeure", "other".
+"non_compete", "non_solicitation", "intellectual_property", "licensing",
+"confidentiality", "privacy_data", "compensation", "termination",
+"liability_limit", "indemnity", "dispute_resolution", "governing_law", 
+"auto_renewal", "amendment", "warranty", "force_majeure", "other".
+
+CRITICAL STRUCTURAL REQUIREMENT:
+You must classify the incoming contract text strictly into one of the following exact category enums. Do NOT deviate, capitalize differently, or use synonyms:
+- "non_compete" (For non-compete, lockouts, sector restrictions)
+- "dispute_resolution" (For mediation, arbitration, governing law, jurisdiction)
+- "compensation" (For salary, bonuses, retention, escrow forfeitures, pay metrics)
+- "intellectual_property" (For copyright, patents, moral waivers, work-for-hire)
+- "confidentiality" (For NDAs, trade secrets, data privacy)
+
+If a clause fits multiple, select the dominant operational mechanism. Do NOT output codes or alternate categories like 'arbitration' or 'payment'. Only the exact string tokens above are valid.
 
 Rules:
 - If unsure, use "other".
