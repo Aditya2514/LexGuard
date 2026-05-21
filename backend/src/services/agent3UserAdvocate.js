@@ -47,7 +47,8 @@ You must reply with valid JSON only, with this structure:
       "id": "clauseObjectId",
       "plain_language_explanation": "...",
       "worst_case_scenario": "...",
-      "negotiation_tip": "..."
+      "negotiation_tip": "...",
+      "suggested_rewrite": "..."
     }
   ]
 }
@@ -58,12 +59,14 @@ You must reply with valid JSON only, with this structure:
   - For low: 1–2 concrete, light suggestions or "no major changes needed, but you can ask for X if concerned".
   - For medium: 2–3 concrete changes you can ask for.
   - For high/critical: 3–5 concrete, specific negotiation asks (e.g., shorten duration, narrow geography, cap amounts, require mutual obligations, neutral arbitrator, etc.).
+- suggested_rewrite: For high/critical risk clauses, you MUST provide a full, cleanly written paragraph showing exactly how the clause should be rewritten to be fair, mutual, and legally compliant. If risk is low/medium, set to null.
 
 ### 4. Special handling rules
 - High/critical clauses ("danger" clauses):
   - plain_language_explanation (at least 40 characters).
   - worst_case_scenario (at least 40 characters).
   - negotiation_tip (at least 40 characters, with multiple concrete suggestions).
+  - suggested_rewrite MUST be populated with a completely redlined, fair alternative clause.
 
 ### 5. Style
 - Write for a non-lawyer reader.
@@ -105,6 +108,9 @@ async function runAgent3UserAdvocate(clausesBatch) {
       negotiation_tip: typeof r.negotiation_tip === 'string'
         ? r.negotiation_tip
         : '',
+      suggested_rewrite: typeof r.suggested_rewrite === 'string'
+        ? r.suggested_rewrite
+        : null,
     }));
 
   return results;
@@ -160,6 +166,7 @@ async function generateUserAdvocateForContract(contractId) {
                 plain_language_explanation: r.plain_language_explanation,
                 worst_case_scenario: r.worst_case_scenario,
                 negotiation_tip: r.negotiation_tip,
+                suggested_rewrite: r.suggested_rewrite,
               },
             },
           },

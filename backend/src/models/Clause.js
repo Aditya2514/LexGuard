@@ -60,6 +60,7 @@ const clauseSchema = new mongoose.Schema(
     plain_language_explanation: { type: String, default: null },
     worst_case_scenario: { type: String, default: null },
     negotiation_tip: { type: String, default: null },
+    suggested_rewrite: { type: String, default: null },
 
     // ── Phase 4: Agent 4 – Indian Compliance Checker ──────────────────────
     compliance_risk_level: {

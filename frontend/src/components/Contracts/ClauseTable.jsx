@@ -289,6 +289,25 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                 </div>
               )}
 
+              {clause.suggested_rewrite && (
+                <div className="expanded-section rewrite-section">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h4 className="expanded-label" style={{ marginBottom: 0, color: '#10b981' }}>✍️ Suggested Fair Rewrite</h4>
+                    <button 
+                      className="copy-rewrite-btn"
+                      onClick={() => navigator.clipboard.writeText(clause.suggested_rewrite)}
+                    >
+                      Copy Text
+                    </button>
+                  </div>
+                  <div className="rewrite-box">
+                    <p className="expanded-text" style={{ fontStyle: 'italic', margin: 0 }}>
+                      "{clause.suggested_rewrite}"
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Law references */}
               {clause.possible_law_references?.length > 0 && (
                 <div className="expanded-section">
