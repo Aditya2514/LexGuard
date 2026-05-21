@@ -46,11 +46,36 @@
   letter-spacing: -0.02em;
 }
 
-.header-tag {
-  font-size: var(--font-xs);
-  color: var(--text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  font-size: var(--font-sm);
+}
+
+.header-nav a {
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: color var(--duration) var(--ease);
+}
+
+.header-nav a:hover {
+  color: var(--text-primary);
+}
+
+.header-nav .upgrade-link {
+  background: var(--accent);
+  color: var(--bg-primary);
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  transition: all var(--duration) var(--ease);
+}
+
+.header-nav .upgrade-link:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 0 10px var(--accent-glow);
+  color: var(--bg-primary);
 }
 
 /* ── Disclaimer Banner ── */

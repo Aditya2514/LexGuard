@@ -5,6 +5,7 @@ const { LEGAL_PLAYBOOK } = require('../config/legalPlaybook');
 // ── In-Memory LRU Cache for Law Retrieval ────────────────────────────────────
 const MAX_CACHE_ENTRIES = 50;
 const lawCache = new Map();
+let allLawSectionsCache = null;
 
 /**
  * Retrieve a value from the LRU cache, updating its insertion order.
@@ -97,6 +98,37 @@ async function getEmbedding(text) {
 }
 
 /**
+ * Warm the embedding cache at server startup.
+ */
+async function warmEmbeddingCache() {
+  try {
+    const sections = await LawSection.find({});
+    allLawSectionsCache = sections; // Cache for the find({}) scan
+    
+    let wacount = 0;
+    for (const sec of sections) {
+      if (!sec.embedding || sec.embedding.length === 0) {
+        try {
+          const textToEmbed = `${sec.title} ${sec.content}`;
+          sec.embedding = await getEmbedding(textToEmbed);
+          await sec.save();
+          wacount++;
+        } catch (embedErr) {
+          console.warn(`⚠️ [RAG-Retriever] Lazy embedding generation failed for ${sec.actKey}:`, embedErr.message);
+        }
+      }
+    }
+    if (wacount > 0) {
+      console.log(`✅ Pre-warmed ${wacount} law section embeddings`);
+    } else {
+      console.log(`✅ Law section embeddings already pre-warmed (${sections.length} total)`);
+    }
+  } catch (err) {
+    console.error(`❌ [RAG-Retriever] Failed to warm embedding cache: ${err.message}`);
+  }
+}
+
+/**
  * Calculate cosine similarity of two vectors
  */
 function cosineSimilarity(vecA, vecB) {
@@ -141,7 +173,9 @@ async function retrieveRelevantLaws(clauseText, clauseType, limit = 2) {
       console.log(`[RAG-Retriever] Running Semantic search. Generating query vector...`);
       const queryVector = await getEmbedding(clauseText);
       
-      const sections = await LawSection.find({});
+      let sections = allLawSectionsCache || await LawSection.find({});
+      if (!allLawSectionsCache && sections.length > 0) allLawSectionsCache = sections;
+
       if (sections.length > 0) {
         console.log(`[RAG-Retriever] Comparing against ${sections.length} candidates using local cosine similarity...`);
         const scoredSections = [];
@@ -255,4 +289,5 @@ async function retrieveRelevantLaws(clauseText, clauseType, limit = 2) {
 
 module.exports = {
   retrieveRelevantLaws,
+  warmEmbeddingCache,
 };

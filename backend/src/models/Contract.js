@@ -15,6 +15,12 @@ const agentMetadataSchema = new mongoose.Schema(
 
 const contractSchema = new mongoose.Schema(
   {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
     originalFileName: {
       type: String,
       required: [true, 'Original file name is required'],

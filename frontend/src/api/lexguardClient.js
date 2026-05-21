@@ -5,8 +5,28 @@
 
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
+let currentToken = localStorage.getItem('lexguard_token') || null;
+
+export function setAuthToken(token) {
+  currentToken = token;
+  if (token) {
+    localStorage.setItem('lexguard_token', token);
+  } else {
+    localStorage.removeItem('lexguard_token');
+  }
+}
+
 async function request(url, options = {}) {
-  const res = await fetch(`${BASE}${url}`, options);
+  const headers = options.headers || {};
+  if (currentToken && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${currentToken}`;
+  }
+  
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const res = await fetch(`${BASE}${url}`, { ...options, headers });
   const body = await res.json();
 
   if (!res.ok) {
@@ -19,16 +39,63 @@ async function request(url, options = {}) {
   return body.data !== undefined ? body.data : body;
 }
 
+// ── Auth ────────────────────────────────────────────────────────────────────
+
+export async function login(email, password) {
+  const res = await request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  if (res.token) setAuthToken(res.token);
+  return res;
+}
+
+export async function register(email, password) {
+  const res = await request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  if (res.token) setAuthToken(res.token);
+  return res;
+}
+
+export async function getProfile() {
+  return request('/auth/me');
+}
+
+export function logout() {
+  setAuthToken(null);
+  window.location.href = '/login';
+}
+
+// ── Payments ────────────────────────────────────────────────────────────────
+
+export async function createOrder(plan) {
+  return request('/payments/create-order', {
+    method: 'POST',
+    body: JSON.stringify({ plan })
+  });
+}
+
+export async function verifyPayment(paymentData) {
+  return request('/payments/verify', {
+    method: 'POST',
+    body: JSON.stringify(paymentData)
+  });
+}
+
+// ── Contracts ───────────────────────────────────────────────────────────────
+
 /** GET /api/contracts */
 export async function getContracts() {
   return request('/contracts');
 }
 
 /** POST /api/contracts (multipart upload) */
-export async function uploadContract(file) {
+export async function uploadContract(file, contractCategory = 'other') {
   const form = new FormData();
   form.append('file', file);
-  form.append('contractCategory', 'other');
+  form.append('contractCategory', contractCategory);
 
   return request('/contracts', {
     method: 'POST',

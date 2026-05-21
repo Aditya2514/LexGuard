@@ -7,11 +7,15 @@ export default function AppLayout() {
       {/* ── Header ── */}
       <header className="app-header">
         <div className="header-inner">
-          <a href="/" className="logo" id="app-logo">
+          <a href="/dashboard" className="logo" id="app-logo">
             <span className="logo-icon">⚖</span>
             <span className="logo-text">LexGuard</span>
           </a>
-          <span className="header-tag">AI Contract Intelligence</span>
+          <nav className="header-nav">
+            <a href="/dashboard">Dashboard</a>
+            <a href="/pricing" className="upgrade-link">Upgrade Plan</a>
+            <a href="#" onClick={() => { localStorage.removeItem('lexguard_token'); window.location.href='/login'; }}>Logout</a>
+          </nav>
         </div>
       </header>
 
@@ -28,6 +32,15 @@ export default function AppLayout() {
       <main className="app-main">
         <Outlet />
       </main>
+
+      {/* ── Footer ── */}
+      <footer style={{ padding: '2rem', textAlign: 'center', borderTop: '1px solid var(--glass-border)', marginTop: 'auto', display: 'flex', gap: '1rem', justifyContent: 'center', fontSize: 'var(--font-sm)', color: 'var(--text-muted)' }}>
+        <span>&copy; 2026 LexGuard</span>
+        <a href="/terms" style={{ color: 'var(--text-muted)' }}>Terms</a>
+        <a href="/privacy" style={{ color: 'var(--text-muted)' }}>Privacy</a>
+        <a href="/refund" style={{ color: 'var(--text-muted)' }}>Refund Policy</a>
+        <a href="/contact" style={{ color: 'var(--text-muted)' }}>Contact Us</a>
+      </footer>
     </div>
   );
 }
