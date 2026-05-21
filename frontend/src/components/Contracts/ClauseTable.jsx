@@ -210,7 +210,7 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
       >
         <td className="clause-idx">{clause.segmentIndex + 1}</td>
         <td className="clause-type-cell">
-          {(clause.clause_type || 'other').replace(/_/g, ' ')}
+          <ClauseTypeBadge type={clause.clause_type} />
         </td>
         <td><RiskBadge riskLevel={clause.risk_level} /></td>
         <td><ComplianceBadge level={clause.compliance_risk_level || 'low'} /></td>
@@ -357,5 +357,33 @@ function ComplianceBadge({ level }) {
     <span className={`compliance-badge compliance-badge-${norm}`}>
       {norm.toUpperCase()} RISK
     </span>
+  );
+}
+
+/* ── Taxonomy Type Badge Helper ─────────────────────────────────────────── */
+
+function ClauseTypeBadge({ type }) {
+  const normType = (type || 'other').toLowerCase();
+  let icon = '📄';
+  let label = normType.replace(/_/g, ' ');
+
+  switch (normType) {
+    case 'non_compete': icon = '🚫'; break;
+    case 'intellectual_property': icon = '💡'; break;
+    case 'dispute_resolution': icon = '⚖️'; break;
+    case 'compensation': icon = '💰'; break;
+    case 'force_majeure': icon = '🌪️'; break;
+    case 'indemnification': icon = '🛡️'; break;
+    case 'termination': icon = '🚪'; break;
+    case 'confidentiality': icon = '🤫'; break;
+    case 'data_privacy': icon = '🔒'; break;
+    default: icon = '📄'; break;
+  }
+
+  return (
+    <div className="clause-type-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.25rem 0.5rem', background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '4px', fontSize: '0.85rem', textTransform: 'capitalize' }}>
+      <span style={{ fontSize: '1.1rem' }}>{icon}</span>
+      <span>{label}</span>
+    </div>
   );
 }

@@ -409,20 +409,105 @@ export default function ContractDetailPage() {
     }
   };
 
-  const handleExportPdf = () => {
-    const element = document.getElementById('pdf-export-content');
-    if (!element) return;
+  const handleExportPdf = async () => {
+    try {
+      const detailedData = await getClausesDetailed(id, 1, 1000);
+      const clausesList = detailedData.clauses || [];
+
+      // Generate highly styled MS Word / PDF compliant HTML content
+      let htmlContent = `
+<div style="font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: #1e293b; line-height: 1.6; background-color: #ffffff; padding: 20px;">
+  <h1 style="color: #065f46; font-size: 24pt; margin-top: 0; margin-bottom: 5pt; border-bottom: 3px solid #10b981; padding-bottom: 8px;">
+    LEXGUARD CONTRACT ANALYSIS REPORT
+  </h1>
+  <p style="font-size: 10pt; color: #64748b;">Generated on: ${new Date().toLocaleString()} | ID: ${id}</p>
+
+  <h2 style="color: #0f172a; font-size: 16pt; margin-top: 25pt; margin-bottom: 10pt; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 4px;">1. Contract Overview</h2>
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 15pt; margin-top: 10pt;">
+    <tr>
+      <th style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; background-color: #f8fafc; font-weight: bold; width: 30%;">File Name</th>
+      <td style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left;">${contract?.originalFileName || 'Contract Document'}</td>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; background-color: #f8fafc; font-weight: bold;">Ingestion Status</th>
+      <td style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left;">${contract?.status === 'done' ? 'Ingestion Success' : 'Ingestion Completed'}</td>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; background-color: #f8fafc; font-weight: bold;">Total Clauses Parsed</th>
+      <td style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left;">${contract?.totalClauses || 0} Clauses</td>
+    </tr>
+    <tr>
+      <th style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; background-color: #f8fafc; font-weight: bold;">Overall Risk Rating</th>
+      <td style="border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; text-transform: uppercase; font-weight: bold;">
+        ${contract?.overallRiskLevel || 'low'}
+      </td>
+    </tr>
+  </table>
+
+  <h2 style="color: #0f172a; font-size: 16pt; margin-top: 25pt; margin-bottom: 10pt; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 4px;">2. Detailed Per-Clause Audit</h2>
+`;
+
+      clausesList.forEach((c) => {
+        const cleanType = (c.clause_type || 'other').replace(/_/g, ' ');
+        const riskLevel = c.risk_level || 'low';
+        
+        htmlContent += `
+  <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 18pt; page-break-inside: avoid;">
+    <div style="font-size: 12.5pt; font-weight: bold; color: #1e293b; margin-bottom: 8pt; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px;">
+      Clause #${c.segmentIndex + 1} &mdash; Type: ${cleanType.toUpperCase()}
+    </div>
     
-    // Create a deep clone to manipulate before printing (remove scrollbars, expand rows if we wanted to)
-    const opt = {
-      margin:       0.5,
-      filename:     `lexguard-report-${id}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(element).save();
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">
+      <strong>Clause Risk Rating:</strong> <span style="text-transform: uppercase;">${riskLevel}</span> 
+      (Score: ${c.risk_score !== null ? c.risk_score : '—'}/10)
+    </p>
+
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Original Clause Contract Wording:</strong></p>
+    <blockquote style="margin: 0; padding: 10px; background-color: #ffffff; border: 1px solid #e2e8f0; font-family: Courier, monospace; font-size: 10pt; margin-bottom: 10pt;">
+      "${c.rawText}"
+    </blockquote>
+
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Plain Language Summary:</strong></p>
+    <p style="color: #475569; margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">${c.plain_language_explanation || '—'}</p>
+
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Worst-Case Legal Scenario:</strong></p>
+    <p style="color: #991b1b; font-weight: 500; margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">${c.worst_case_scenario || '—'}</p>
+`;
+        if (c.suggested_rewrite) {
+          htmlContent += `
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Suggested Fair Rewrite:</strong></p>
+    <p style="color: #10b981; font-weight: 500; font-style: italic; margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">"${c.suggested_rewrite}"</p>
+`;
+        }
+        
+        htmlContent += `</div>`;
+      });
+
+      htmlContent += `
+  <div style="font-size: 9pt; color: #64748b; font-style: italic; margin-top: 30pt; border-top: 1px solid #e2e8f0; padding-top: 10px; text-align: center;">
+    <h3 style="color: #059669; font-size: 12pt; margin-top: 15pt; margin-bottom: 5pt;">LEGAL & COMPLIANCE DISCLAIMER</h3>
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 9pt;">
+      LexGuard Contract Intelligence is an AI tool powered by advanced language modeling. The analysis, risk scores, summaries, and regulatory references provided in this report are for educational and risk-intelligence workflows only, and do not constitute formal legal advice. This report does not establish an attorney-client relationship. Always engage qualified legal counsel licensed in India to review critical contracts before signing.
+    </p>
+    <p style="margin-top: 0; margin-bottom: 8pt; font-size: 9pt;">&copy; ${new Date().getFullYear()} LexGuard Inc. All Rights Reserved.</p>
+  </div>
+</div>
+`;
+
+      const opt = {
+        margin:       0.5,
+        filename:     `lexguard-report-${id}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      
+      const element = document.createElement('div');
+      element.innerHTML = htmlContent;
+      html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      alert(`Could not export PDF report: ${err.message}`);
+    }
   };
 
   const isAnalyzing = contract?.status === 'processing' || contract?.status === 'pending';

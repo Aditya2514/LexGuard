@@ -38,5 +38,37 @@
     "expected_risk": "HIGH",
     "expected_violation": true,
     "legal_hook": "Section 19(4) of the Copyright Act, 1957 - Predatory statutory contracting-out."
+  },
+  {
+    "id": "TC_006_FORCE_MAJEURE_UNILATERAL",
+    "text": "In the event of a pandemic, strike, or act of God, the Company's obligations to pay fees shall be suspended. However, the Contractor's obligation to deliver services remains absolute and unmodified.",
+    "expected_type": "force_majeure",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Lack of Mutuality - One-sided suspension of obligations."
+  },
+  {
+    "id": "TC_007_IP_PRIOR_INVENTION_CAPTURE",
+    "text": "The Employee assigns to the Company all rights, title, and interest in any intellectual property conceived, developed, or reduced to practice prior to the commencement of employment, unless specifically listed in Exhibit A (which is left blank).",
+    "expected_type": "intellectual_property",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Overbroad IP Capture - Attempting to seize pre-existing personal property without separate consideration."
+  },
+  {
+    "id": "TC_008_INDEMNIFICATION_BROAD",
+    "text": "The Vendor agrees to indemnify, defend, and hold harmless the Company against any and all claims, including those arising entirely from the Company's own gross negligence or willful misconduct.",
+    "expected_type": "indemnification",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Unconscionable Indemnification - Mandating coverage for the indemnitee's own gross negligence."
+  },
+  {
+    "id": "TC_009_TERMINATION_FOR_CONVENIENCE",
+    "text": "The Company may terminate this Agreement at any time, for any reason or no reason, upon 24 hours' notice. The Contractor shall not be entitled to payment for any work completed prior to termination that has not yet been invoiced.",
+    "expected_type": "termination",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Forfeiture of Earned Wages/Fees - Termination for convenience without payment for rendered services."
   }
 ]
