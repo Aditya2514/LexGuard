@@ -14,16 +14,16 @@ export default function ContractChatSidebar({ contractId }) {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (overrideText = null) => {
+    const textToSend = typeof overrideText === 'string' ? overrideText : input;
+    if (!textToSend.trim()) return;
 
-    const userMsg = input.trim();
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+    setMessages(prev => [...prev, { role: 'user', text: textToSend.trim() }]);
     setInput('');
     setLoading(true);
 
     try {
-      const { reply } = await chatWithContract(contractId, userMsg);
+      const { reply } = await chatWithContract(contractId, textToSend.trim());
       setMessages(prev => [...prev, { role: 'assistant', text: reply }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', text: '⚠️ Error: ' + err.message }]);
@@ -31,6 +31,12 @@ export default function ContractChatSidebar({ contractId }) {
       setLoading(false);
     }
   };
+
+  const shortcodes = [
+    '🔍 Analyze Notice Period',
+    '🛡️ Check Indemnification Caps',
+    '🏛️ Verify IP Ownership'
+  ];
 
   return (
     <div className="chat-sidebar glass-card">
@@ -50,6 +56,18 @@ export default function ContractChatSidebar({ contractId }) {
         )}
         <div ref={endRef} />
       </div>
+      <div className="chat-shortcodes">
+        {shortcodes.map((sc, i) => (
+          <button 
+            key={i} 
+            className="chat-shortcode-chip"
+            onClick={() => handleSend(sc)}
+            disabled={loading}
+          >
+            {sc}
+          </button>
+        ))}
+      </div>
       <div className="chat-input-area">
         <input 
           type="text" 
@@ -58,7 +76,7 @@ export default function ContractChatSidebar({ contractId }) {
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSend()}
         />
-        <button onClick={handleSend} disabled={loading || !input.trim()}>
+        <button onClick={() => handleSend()} disabled={loading || !input.trim()}>
           Send
         </button>
       </div>

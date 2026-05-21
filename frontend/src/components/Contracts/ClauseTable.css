@@ -149,9 +149,33 @@
   transition: all 0.2s ease;
 }
 
-.copy-rewrite-btn:hover {
+.copy-rewrite-btn.copied {
   background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
   border-color: rgba(16, 185, 129, 0.8);
+  transform: scale(1.05);
+}
+
+.copy-rewrite-btn:hover:not(.copied) {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+/* Redline Visual Diff Styles */
+.diff-deletion {
+  text-decoration: line-through;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 0 0.2em;
+  border-radius: 2px;
+}
+
+.diff-addition {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0 0.2em;
+  border-radius: 2px;
+  font-weight: 500;
 }
 
 /* Risk reasons list */
