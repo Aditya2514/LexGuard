@@ -109,20 +109,21 @@ const ALLOWED_ACT_KEYS = Object.keys(LAW_REFERENCES);
  */
 
 /**
- * Executes the Adversarial Reflection pass over the Base Analyst's outputs
+ * Executes the Adversarial Reflection pass over a batch of Base Analyst outputs.
+ * We only send clauses that the base analyst scored as medium, high, or critical.
  */
-async function runAdversarialJudge(globalContext, clauseText, baseAnalysisJson) {
+async function runAdversarialJudgeBatch(globalContext, clauseTextMap, baseResultsBatch) {
   const prompt = `
   === GLOBAL CONTRACT CONTEXT ===
   ${JSON.stringify(globalContext || {}, null, 2)}
   
-  === ORIGINAL CLAUSE TEXT ===
-  "${clauseText}"
+  === ORIGINAL CLAUSE TEXTS ===
+  ${JSON.stringify(clauseTextMap, null, 2)}
   
-  === BASE ANALYST DRAFT REPORT ===
-  ${JSON.stringify(baseAnalysisJson, null, 2)}
+  === BASE ANALYST DRAFT REPORTS (BATCH) ===
+  ${JSON.stringify(baseResultsBatch, null, 2)}
   
-  Execute your adversarial quality audit now. Output the final, verified JSON object.
+  Execute your adversarial quality audit now on all clauses in the batch. Output the final, verified JSON array of results.
   `;
 
   try {
@@ -131,14 +132,12 @@ async function runAdversarialJudge(globalContext, clauseText, baseAnalysisJson) 
       userContent: prompt,
       jsonMode: true,
       temperature: 0.1, // Kept low for deterministic legal evaluation
-      maxTokens: 4096,
+      maxTokens: 6144, // Increased tokens for batch
     });
-    if (rawOutput && Array.isArray(rawOutput.results)) return rawOutput.results[0] || rawOutput;
-    if (Array.isArray(rawOutput)) return rawOutput[0] || baseAnalysisJson;
-    return rawOutput || baseAnalysisJson;
+    return rawOutput.results || rawOutput || baseResultsBatch;
   } catch (err) {
-    console.error('[Adversarial Judge] Failed reflection pass, falling back to base:', err.message);
-    return baseAnalysisJson;
+    console.error('[Adversarial Judge] Failed batch reflection pass, falling back to base:', err.message);
+    return baseResultsBatch;
   }
 }
 
@@ -184,30 +183,45 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
 
   const baseResults = (resp.results || []).filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id));
   
-  // Step 2: Immediate Adversarial Reflection Audit Loop (Agent 2.5)
-  const finalResults = await Promise.all(
-    baseResults.map(async (baseAnalysis) => {
-      const originalText = clauseTextMap[baseAnalysis.id] || '';
-      const verifiedAnalysis = await runAdversarialJudge(globalContext, originalText, baseAnalysis);
-      
-      const risk_score = verifiedAnalysis.risk_score !== undefined ? verifiedAnalysis.risk_score : (verifiedAnalysis.score !== undefined ? verifiedAnalysis.score : baseAnalysis.risk_score);
-      const risk_level = verifiedAnalysis.risk_level || verifiedAnalysis.riskRating || baseAnalysis.risk_level;
-      const risk_reasons = verifiedAnalysis.risk_reasons || (verifiedAnalysis.auditNote ? [verifiedAnalysis.auditNote] : baseAnalysis.risk_reasons);
-      const possible_law_references = verifiedAnalysis.possible_law_references || verifiedAnalysis.citations || baseAnalysis.possible_law_references;
-      
-      const score = clampScore(risk_score);
-      let level = RISK_LEVELS.includes(risk_level ? risk_level.toLowerCase() : '') ? risk_level.toLowerCase() : 'medium';
-      if (score <= 5 && level !== 'low') level = 'low';
-      
-      return {
-        id: baseAnalysis.id,
-        risk_level: level,
-        risk_score: score,
-        risk_reasons: Array.isArray(risk_reasons) ? risk_reasons : [],
-        possible_law_references: sanitiseLawRefs(possible_law_references),
-      };
-    })
-  );
+  // Selective Judge: only run judge on clauses that have medium, high, or critical risk
+  const riskyResults = baseResults.filter(r => r.risk_level && r.risk_level !== 'low');
+  
+  let verifiedRiskyResults = [];
+  if (riskyResults.length > 0) {
+    const riskyClauseTextMap = {};
+    for (const r of riskyResults) {
+      riskyClauseTextMap[r.id] = clauseTextMap[r.id];
+    }
+    
+    // Batch run the judge
+    const judgeRaw = await runAdversarialJudgeBatch(globalContext, riskyClauseTextMap, riskyResults);
+    const judgeArray = Array.isArray(judgeRaw) ? judgeRaw : [];
+    
+    verifiedRiskyResults = judgeArray;
+  }
+  
+  // Merge and normalize results
+  const finalResults = baseResults.map((baseAnalysis) => {
+    // Find verified analysis if it exists, otherwise use base
+    const verifiedAnalysis = verifiedRiskyResults.find(v => v.id === baseAnalysis.id) || baseAnalysis;
+    
+    const risk_score = verifiedAnalysis.risk_score !== undefined ? verifiedAnalysis.risk_score : (verifiedAnalysis.score !== undefined ? verifiedAnalysis.score : baseAnalysis.risk_score);
+    const risk_level = verifiedAnalysis.risk_level || verifiedAnalysis.riskRating || baseAnalysis.risk_level;
+    const risk_reasons = verifiedAnalysis.risk_reasons || (verifiedAnalysis.auditNote ? [verifiedAnalysis.auditNote] : baseAnalysis.risk_reasons);
+    const possible_law_references = verifiedAnalysis.possible_law_references || verifiedAnalysis.citations || baseAnalysis.possible_law_references;
+    
+    const score = clampScore(risk_score);
+    let level = RISK_LEVELS.includes(risk_level ? risk_level.toLowerCase() : '') ? risk_level.toLowerCase() : 'medium';
+    if (score <= 5 && level !== 'low') level = 'low';
+    
+    return {
+      id: baseAnalysis.id,
+      risk_level: level,
+      risk_score: score,
+      risk_reasons: Array.isArray(risk_reasons) ? risk_reasons : [],
+      possible_law_references: sanitiseLawRefs(possible_law_references),
+    };
+  });
 
   return finalResults;
 }
@@ -330,4 +344,4 @@ async function analyseRisksForContract(contractId) {
   );
 }
 
-module.exports = { runAgent2RiskAnalyst, analyseRisksForContract, runAdversarialJudge };
+module.exports = { runAgent2RiskAnalyst, analyseRisksForContract, runAdversarialJudgeBatch };

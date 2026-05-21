@@ -8,9 +8,10 @@ const fs   = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
 
-const BASE_URL = 'http://localhost:5001';
+const BASE_URL = 'http://localhost:7860';
 let passed = 0, failed = 0;
 const failures = [];
+let authToken = '';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -27,7 +28,11 @@ function assert(label, condition, detail = '') {
 
 async function req(method, urlPath, opts = {}) {
   try {
-    const res = await fetch(`${BASE_URL}${urlPath}`, { method, ...opts });
+    const headers = opts.headers || {};
+    if (authToken && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    const res = await fetch(`${BASE_URL}${urlPath}`, { method, ...opts, headers });
     let body;
     try { body = await res.json(); } catch { body = null; }
     return { status: res.status, body };
@@ -113,6 +118,22 @@ async function g1_health() {
   const r2 = await req('GET', '/xyz');
   assert('Unknown route → 404', r2.status === 404);
   assert('404 has message', typeof r2.body?.message === 'string');
+}
+
+async function g1b_auth() {
+  console.log('\n══ GROUP 1B: Authentication ════════════════════════════');
+  const email = `test-${Date.now()}@example.com`;
+  const r1 = await req('POST', '/api/auth/register', {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: 'password123' })
+  });
+  assert('Register → 201', r1.status === 201);
+  assert('Returns token', !!r1.body?.token);
+  authToken = r1.body?.token || '';
+
+  const r2 = await req('GET', '/api/auth/me');
+  assert('GET /me → 200', r2.status === 200);
+  assert('User is authenticated', r2.body?.user?.email === email);
 }
 
 async function g2_postValidation(docxBuf) {
@@ -378,6 +399,7 @@ async function g10_riskSummary(docxBuf) {
   console.log(`  DOCX verified ✅ (${testText.length} chars, ${testText.split('\n').filter(Boolean).length} lines)`);
 
   await g1_health();
+  await g1b_auth();
   await g2_postValidation(docxBuf);
   await g3_fileSize();
   const { id1, id2 } = await g4_happyPath(docxBuf);

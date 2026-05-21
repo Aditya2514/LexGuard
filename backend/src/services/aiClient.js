@@ -307,7 +307,7 @@ async function callLLM({
 } = {}) {
   // Intelligent Token-Aware Automatic Chunking Handler
   const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4.0);
-  if (estimatedTokens > 3000) {
+  if (estimatedTokens > 12000) {
     let parsed = null;
     try {
       parsed = JSON.parse(userContent);

@@ -19,6 +19,8 @@ const ApiResponse = require('../utils/ApiResponse');
 const { CONTRACT_CATEGORIES, MAX_FILE_SIZE_BYTES } = require('../config/constants');
 const jobQueueService = require('../services/jobQueueService');
 const QueueJob = require('../models/QueueJob');
+const User = require('../models/User');
+const { protect } = require('../middleware/auth');
 
 // ── Multer Setup ────────────────────────────────────────────────────────────
 
@@ -78,12 +80,19 @@ const deleteTempFile = (filePath) => {
 // ── POST /api/contracts ─────────────────────────────────────────────────────
 // Upload a contract file, extract text, split into clauses, store in DB.
 
+router.use(protect); // Protect all contract routes
+
 router.post(
   '/',
   upload.single('file'),
   asyncHandler(async (req, res) => {
     if (!req.file) {
       throw new ApiError(400, 'No file uploaded. Please attach a PDF or DOCX file as the "file" field.');
+    }
+
+    if (req.user.usedThisMonth >= req.user.monthlyQuota) {
+      deleteTempFile(req.file.path);
+      throw new ApiError(429, 'Monthly contract quota exceeded. Please upgrade your plan.');
     }
 
     const { contractCategory } = req.body;
@@ -115,12 +124,17 @@ router.post(
 
       // 3. Persist Contract document
       contract = await Contract.create({
+        userId: req.user._id,
         originalFileName: req.file.originalname,
         contractCategory,
         rawText: cleanedText,
         totalClauses: clauseSegments.length,
         status: 'processing',
       });
+      
+      // Increment user quota
+      req.user.usedThisMonth += 1;
+      await req.user.save();
 
       // 4. Bulk-insert all Clause documents
       const clauseDocs = clauseSegments.map((seg) => ({
@@ -187,8 +201,8 @@ router.post(
 
 router.get(
   '/',
-  asyncHandler(async (_req, res) => {
-    const contracts = await Contract.find()
+  asyncHandler(async (req, res) => {
+    const contracts = await Contract.find({ userId: req.user._id })
       .select('_id originalFileName contractCategory status totalClauses overallRiskLevel uploadedAt')
       .sort({ uploadedAt: -1 });
 
@@ -204,7 +218,7 @@ router.get(
 router.get(
   '/:id',
   asyncHandler(async (req, res) => {
-    const contract = await Contract.findById(req.params.id);
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
     // Fetch background job details
@@ -233,7 +247,7 @@ router.get(
 router.get(
   '/:id/clauses',
   asyncHandler(async (req, res) => {
-    const contract = await Contract.findById(req.params.id).select('_id');
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id }).select('_id');
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -266,7 +280,7 @@ router.get(
 router.get(
   '/:id/clauses-detailed',
   asyncHandler(async (req, res) => {
-    const contract = await Contract.findById(req.params.id).select('_id');
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id }).select('_id');
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -305,8 +319,11 @@ router.get(
 router.get(
   '/:id/risk-summary',
   asyncHandler(async (req, res) => {
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id }).select('_id');
+    if (!contract) throw new ApiError(404, 'Contract not found.');
+
     const summary = await computeRiskSummaryForContract(req.params.id);
-    if (!summary) throw new ApiError(404, 'Contract not found.');
+    if (!summary) throw new ApiError(404, 'Summary could not be generated.');
 
     return res.status(200).json(
       new ApiResponse(200, summary, 'Risk summary generated.')
@@ -320,7 +337,7 @@ router.get(
 router.delete(
   '/:id',
   asyncHandler(async (req, res) => {
-    const contract = await Contract.findById(req.params.id);
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
     await Clause.deleteMany({ contractId: req.params.id });

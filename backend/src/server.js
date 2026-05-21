@@ -3,8 +3,13 @@ require('dotenv').config(); // Trigger nodemon restart for groq multi-provider u
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const authRoutes = require('./routes/authRoutes');
 const contractRoutes = require('./routes/contractRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const ApiError = require('./utils/ApiError');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const User = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 7860;
@@ -13,12 +18,19 @@ const PORT = process.env.PORT || 7860;
 connectDB();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
+app.use(helmet());
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+}));
 app.use(cors());
 app.use(express.json({ limit: '11mb' }));
 app.use(express.urlencoded({ extended: true, limit: '11mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth', authRoutes);
 app.use('/api/contracts', contractRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
@@ -109,6 +121,29 @@ if (!process.env.VERCEL) {
     // Start background job queue processor
     const jobQueueService = require('./services/jobQueueService');
     jobQueueService.startQueueWorker();
+    
+    // Warm embedding cache
+    const { warmEmbeddingCache } = require('./services/lawRetrieverService');
+    warmEmbeddingCache();
+    
+    // Daily quota reset cron (runs every hour)
+    setInterval(async () => {
+      try {
+        const now = new Date();
+        const res = await User.updateMany(
+          { quotaResetDate: { $lte: now } },
+          { 
+            usedThisMonth: 0, 
+            quotaResetDate: new Date(now.getTime() + 30 * 86400000) 
+          }
+        );
+        if (res.modifiedCount > 0) {
+          console.log(`[Cron] Reset quotas for ${res.modifiedCount} users.`);
+        }
+      } catch (err) {
+        console.error('[Cron] Error resetting quotas:', err);
+      }
+    }, 60 * 60 * 1000);
   });
 }
 
