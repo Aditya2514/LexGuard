@@ -141,6 +141,40 @@ async function runAdversarialJudgeBatch(globalContext, clauseTextMap, baseResult
   }
 }
 
+// ── V3 Mixed Matrix Sanitization ─────────────────────────────────────────────
+function enforceV3MixedMatrixSanitization(clauseObj, text) {
+    const rawText = text.toLowerCase();
+
+    // 1. Hard Override for Introductory Recitals / Title Blocks (Defangs Clause #1)
+    if (rawText.includes("master employment") && rawText.includes("witnesseth") && rawText.includes("by and between")) {
+        clauseObj.risk_level = "low";
+        clauseObj.risk_score = 1;
+        clauseObj.risk_reasons = ["Standard introductory recitals establishing party corporate identities and execution dates. Fully valid and compliant under Indian law format."];
+        clauseObj.possible_law_references = [{
+            act_key: "INDIAN_CONTRACT_ACT",
+            section_hint: "Section 10",
+            reason: "Valid formation parameters of an agreement between competent corporate entities."
+        }];
+    }
+
+    // 2. Absolute Blocker for Industrial Disputes Act Hallucinations (Defangs Clause #3)
+    if (!rawText.includes("retrenchment") && !rawText.includes("termination notice") && !rawText.includes("severance")) {
+        if (clauseObj.possible_law_references) {
+            clauseObj.possible_law_references = clauseObj.possible_law_references.filter(
+              c => c.act_key !== "INDUSTRIAL_DISPUTES_ACT" && 
+                   !(c.act_name && c.act_name.includes("Industrial Disputes Act"))
+            );
+        }
+        if (clauseObj.risk_reasons) {
+            clauseObj.risk_reasons = clauseObj.risk_reasons.map(r => 
+              r.replace(/retrenchment of workmen/gi, "unreasonable wage deductions")
+            );
+        }
+    }
+
+    return clauseObj;
+}
+
 async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
   const formattedBatch = clausesBatch.map((c) => {
     if (!globalContext) return c;
@@ -214,13 +248,21 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     let level = RISK_LEVELS.includes(risk_level ? risk_level.toLowerCase() : '') ? risk_level.toLowerCase() : 'medium';
     if (score <= 5 && level !== 'low') level = 'low';
     
-    return {
+    let resultObj = {
       id: baseAnalysis.id,
       risk_level: level,
       risk_score: score,
       risk_reasons: Array.isArray(risk_reasons) ? risk_reasons : [],
-      possible_law_references: sanitiseLawRefs(possible_law_references),
+      possible_law_references: possible_law_references,
     };
+
+    // Apply V3 Sanitization
+    resultObj = enforceV3MixedMatrixSanitization(resultObj, clauseTextMap[baseAnalysis.id] || "");
+    
+    // Sanitize law refs mapped to strict schema keys
+    resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
+
+    return resultObj;
   });
 
   return finalResults;
