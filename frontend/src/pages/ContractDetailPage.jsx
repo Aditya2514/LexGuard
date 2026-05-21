@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import html2pdf from 'html2pdf.js';
 import { getContract, getRiskSummary, getClausesDetailed } from '../api/lexguardClient';
 import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
@@ -408,20 +409,45 @@ export default function ContractDetailPage() {
     }
   };
 
+  const handleExportPdf = () => {
+    const element = document.getElementById('pdf-export-content');
+    if (!element) return;
+    
+    // Create a deep clone to manipulate before printing (remove scrollbars, expand rows if we wanted to)
+    const opt = {
+      margin:       0.5,
+      filename:     `lexguard-report-${id}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(element).save();
+  };
+
   const isAnalyzing = contract?.status === 'processing' || contract?.status === 'pending';
 
   return (
     <div className="page-container">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <Link to="/dashboard" className="btn btn-ghost" id="back-to-list">← All Contracts</Link>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleExportReport} 
-          id="btn-export-report"
-          disabled={isAnalyzing}
-        >
-          📥 Download Analysis Report
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleExportReport} 
+            disabled={isAnalyzing}
+          >
+            📥 Download Word Report
+          </button>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleExportPdf} 
+            disabled={isAnalyzing}
+            style={{ backgroundColor: '#dc2626', borderColor: '#b91c1c' }}
+          >
+            📄 Export PDF
+          </button>
+        </div>
       </div>
 
       {isAnalyzing && (
@@ -471,7 +497,7 @@ export default function ContractDetailPage() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', alignItems: 'start' }}>
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <div id="pdf-export-content" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <ContractSummary contract={contract} riskSummary={riskSummary} />
           <ClauseTable contractId={id} contractStatus={contract?.status} />
         </div>
