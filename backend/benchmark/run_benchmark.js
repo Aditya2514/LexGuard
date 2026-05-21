@@ -88,7 +88,7 @@ async function startBenchmarkRunner() {
 
   for (const tc of dataset) {
     console.log(`\n🔎 [Testing] ID: ${tc.id}`);
-    await wait(1000); // Steady operational pacing delay to prevent rate limit fires
+    await wait(3000); // Steady operational pacing delay to prevent rate limit fires
 
     try {
       const mockId = new mongoose.Types.ObjectId().toString();

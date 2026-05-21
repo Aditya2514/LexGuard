@@ -22,7 +22,7 @@ You receive a list of clauses from a contract. For each clause:
 Allowed clause_type values (use exactly these strings):
 "non_compete", "non_solicitation", "intellectual_property", "licensing",
 "confidentiality", "privacy_data", "compensation", "termination",
-"liability_limit", "indemnity", "dispute_resolution", "governing_law", 
+"liability_limit", "indemnification", "dispute_resolution", "governing_law", 
 "auto_renewal", "amendment", "warranty", "force_majeure", "other".
 
 CRITICAL STRUCTURAL REQUIREMENT:
@@ -32,6 +32,9 @@ You must classify the incoming contract text strictly into one of the following 
 - "compensation" (For salary, bonuses, retention, escrow forfeitures, pay metrics)
 - "intellectual_property" (For copyright, patents, moral waivers, work-for-hire)
 - "confidentiality" (For NDAs, trade secrets, data privacy)
+- "force_majeure" (For acts of god, pandemics, strikes, suspended obligations)
+- "indemnification" (For hold harmless, defense, liability shifts)
+- "termination" (For termination for convenience, cause, notice periods)
 
 If a clause fits multiple, select the dominant operational mechanism. Do NOT output codes or alternate categories like 'arbitration' or 'payment'. Only the exact string tokens above are valid.
 

@@ -74,7 +74,7 @@ You must reply with valid JSON only, with this structure:
 - Strict Boilerplate Isolation: Do NOT output boilerplate phrases (like "training bonds") unless you can extract a direct text fragment showing that explicit mechanism within the evaluated clause boundaries.
 - Heightened IP Parsing Specificity: Flag any instance where a statutory section number is explicitly mentioned inside contract wording (such as "Section 19(4)") to double-check that you map that exact law in the final authority box.
 - Dynamic Citation Subtitles: When citing a specific statutory section, NEVER copy the title or label string from retrieved_legal_context verbatim. You MUST generate a fresh, context-specific subtitle derived from the actual violation pattern in the clause text (e.g., if the clause discusses escrow credits, write 'Section 74 - Conditional Escrow Forfeiture', NOT 'Section 74 - Unenforceable training bonds & administrative markup').
-- Safe Harbor Validation Protocol: Before assigning a MEDIUM, HIGH, or CRITICAL risk rating to any clause, evaluate whether the contract text explicitly uses saving or protective qualifiers. If a clause explicitly guarantees compliance with statutory frameworks (e.g., "in absolute accordance with applicable local regulations", "conforming strictly with the state Shops and Establishments framework", "limited strictly to in-scope working hours", or "mutual consensus of both parties"), you MUST default to LOW risk (score 1-2) for that clause, unless an explicit contractual penalty, waiver, or punitive mechanism is also present in the same clause text. The mere mention of a legal term (such as "Arbitration", "Confidentiality", "Intellectual Property", or "Non-Solicitation") must NOT trigger a risk elevation if the mechanism described is inherently mutual, consensual, time-limited to a reasonable period, or textually compliant with Indian default statutory protections.
+- Safe Harbor Validation Protocol: Before assigning a MEDIUM, HIGH, or CRITICAL risk rating to any clause, evaluate whether the contract text explicitly uses saving or protective qualifiers. If a clause explicitly guarantees compliance with statutory frameworks (e.g., "in absolute accordance with applicable local regulations", "conforming strictly with the state Shops and Establishments framework", "limited strictly to in-scope working hours", or "mutual consensus of both parties"), you MUST default to LOW risk (score 1-2) for that clause, unless an explicit contractual penalty, waiver, unconscionable indemnification, unilateral force majeure, or punitive mechanism is also present in the same clause text. The mere mention of a legal term (such as "Arbitration", "Confidentiality", "Intellectual Property", or "Non-Solicitation") must NOT trigger a risk elevation if the mechanism described is inherently mutual, consensual, time-limited to a reasonable period, or textually compliant with Indian default statutory protections. However, sweeping captures of pre-existing intellectual property, indemnifications covering gross negligence, or terminations without payment for work performed MUST be flagged as HIGH/CRITICAL.
 - **Precedent Prioritization Protocol**: If a Supreme Court or High Court Precedent (act_key: CASE_LAW) is provided in your retrieved_legal_context, you MUST prioritize its holdings over the raw statutory text of a Bare Act, as judicial precedent governs the application of the statute. explicitly cite the holding of the case when explaining your risk reasons.
 `;
 
@@ -92,8 +92,8 @@ You are an adversarial layer designed to eliminate two critical systemic errors:
 - "strict scope of employment" (Work-for-Hire IP assignment is completely valid and low risk if scoped to employment hours/resources)
 - "confidentiality regarding trade secrets" (Post-employment NDAs are standard and low risk if reasonable)
 
-CRITICAL OVERRIDE RULE: Predatory traps ALWAYS supersede safe harbors. If the clause contains ANY predatory mechanism (such as "unilateral", "sole right", "liquidated penalty", "forfeiture", or "waive... Section 19(4)"), you MUST IGNORE all safe harbors and ESCALATE the score to HIGH/CRITICAL (8-10). Do NOT downgrade.
-2. FALSE NEGATIVES (Overlooked Traps): If the Base Analyst missed an explicit predatory mechanism (e.g., contracting out of Section 19(4) of the Copyright Act, unilateral sole arbitrator selection, shifting business risks via Section 74 salary escrow forfeitures), you must REJECT its lenient assessment, escalate the rating to HIGH/CRITICAL, and insert the precise statutory warning block.
+CRITICAL OVERRIDE RULE: Predatory traps ALWAYS supersede safe harbors. If the clause contains ANY predatory mechanism (such as "unilateral", "sole right", "liquidated penalty", "forfeiture", "waive... Section 19(4)", "prior to the commencement of employment", "gross negligence", or "without payment for any work completed"), you MUST IGNORE all safe harbors and ESCALATE the score to HIGH/CRITICAL (8-10). Do NOT downgrade.
+2. FALSE NEGATIVES (Overlooked Traps): If the Base Analyst missed an explicit predatory mechanism (e.g., contracting out of Section 19(4) of the Copyright Act, unilateral sole arbitrator selection, shifting business risks via Section 74 salary escrow forfeitures, unilateral force majeure suspensions, sweeping IP capture of pre-existing inventions, unconscionable indemnification covering gross negligence, or termination without paying for rendered services), you must REJECT its lenient assessment, escalate the rating to HIGH/CRITICAL, and insert the precise statutory warning block.
 
 You must output a strictly validated JSON array matching the exact structure of the input, with corrected risk ratings, scores, audit notes, and citations based on your verification. No conversational wrappers.
 
@@ -222,6 +222,73 @@ function cleanMixedMatrixDownstreamLeaks(clauseObj, text) {
     return clauseObj;
 }
 
+// ── V5 Deterministic Predatory Trap Escalation ───────────────────────────────
+// Safety net: catches sophisticated predatory patterns that the LLM consistently
+// rates as LOW because they use polished legal language to disguise the trap.
+// Runs AFTER the LLM and Judge as a hard-coded escalation layer.
+function enforcePredatoryTrapEscalation(clauseObj, text) {
+    const raw = text.toLowerCase();
+
+    // 1. Unilateral Force Majeure: Company suspends its obligations but
+    //    contractor/employee obligations remain "absolute" or "unmodified"
+    if ((raw.includes('force majeure') || raw.includes('act of god') || raw.includes('pandemic')) &&
+        (raw.includes('suspended') || raw.includes('shall be suspended')) &&
+        (raw.includes('absolute') || raw.includes('unmodified') || raw.includes('remains in full'))) {
+        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
+            clauseObj.risk_level = 'critical';
+            clauseObj.risk_score = 9;
+            clauseObj.risk_reasons = [
+                'One-sided force majeure clause: Company suspends its payment obligations during force majeure events, but the counterparty must continue performing. This creates a severe lack of mutuality.',
+                ...(clauseObj.risk_reasons || [])
+            ];
+        }
+    }
+
+    // 2. Pre-existing IP Capture: Assigns IP created BEFORE employment,
+    //    especially with a blank or missing Exhibit
+    if ((raw.includes('prior to the commencement') || raw.includes('prior to employment') || raw.includes('pre-existing')) &&
+        (raw.includes('assigns') || raw.includes('assign') || raw.includes('rights, title')) &&
+        (raw.includes('intellectual property') || raw.includes('invention'))) {
+        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
+            clauseObj.risk_level = 'critical';
+            clauseObj.risk_score = 9;
+            clauseObj.risk_reasons = [
+                'Sweeping capture of pre-existing intellectual property: This clause attempts to seize IP created before the employment relationship began, potentially without separate consideration. Exhibit exclusion lists left blank effectively capture everything.',
+                ...(clauseObj.risk_reasons || [])
+            ];
+        }
+    }
+
+    // 3. Indemnification covering gross negligence / willful misconduct
+    if ((raw.includes('indemnify') || raw.includes('indemnification') || raw.includes('hold harmless')) &&
+        (raw.includes('gross negligence') || raw.includes('willful misconduct') || raw.includes('wilful misconduct'))) {
+        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
+            clauseObj.risk_level = 'critical';
+            clauseObj.risk_score = 9;
+            clauseObj.risk_reasons = [
+                'Unconscionable indemnification: This clause requires the indemnitor to cover losses arising from the indemnitee\'s own gross negligence or willful misconduct. Indian courts may view this as contrary to public policy under Section 23 of the Indian Contract Act.',
+                ...(clauseObj.risk_reasons || [])
+            ];
+        }
+    }
+
+    // 4. Punitive wage forfeiture: withholding salary and permanent forfeiture
+    if ((raw.includes('withhold') || raw.includes('deduct') || raw.includes('reserve')) &&
+        (raw.includes('forfeited') || raw.includes('forfeiture') || raw.includes('permanently')) &&
+        (raw.includes('compensation') || raw.includes('salary') || raw.includes('wages'))) {
+        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium' || clauseObj.risk_level === 'high') {
+            clauseObj.risk_level = 'critical';
+            clauseObj.risk_score = 9;
+            clauseObj.risk_reasons = [
+                'Punitive wage forfeiture mechanism: Withholding a portion of earned compensation and permanently forfeiting it constitutes an unenforceable penalty under Section 74 of the Indian Contract Act, and may violate the Payment of Wages Act.',
+                ...(clauseObj.risk_reasons || [])
+            ];
+        }
+    }
+
+    return clauseObj;
+}
+
 async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
   const formattedBatch = clausesBatch.map((c) => {
     if (!globalContext) return c;
@@ -264,8 +331,8 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
 
   const baseResults = (resp.results || []).filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id));
   
-  // Selective Judge: only run judge on clauses that have medium, high, or critical risk
-  const riskyResults = baseResults.filter(r => r.risk_level && r.risk_level !== 'low');
+  // Adversarial Judge: run judge on all clauses to catch both False Positives and False Negatives
+  const riskyResults = baseResults;
   
   let verifiedRiskyResults = [];
   if (riskyResults.length > 0) {
@@ -291,9 +358,18 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     const risk_reasons = verifiedAnalysis.risk_reasons || (verifiedAnalysis.auditNote ? [verifiedAnalysis.auditNote] : baseAnalysis.risk_reasons);
     const possible_law_references = verifiedAnalysis.possible_law_references || verifiedAnalysis.citations || baseAnalysis.possible_law_references;
     
-    const score = clampScore(risk_score);
+    let score = clampScore(risk_score);
     let level = RISK_LEVELS.includes(risk_level ? risk_level.toLowerCase() : '') ? risk_level.toLowerCase() : 'medium';
-    if (score <= 5 && level !== 'low') level = 'low';
+
+    // ── Bidirectional Score ↔ Level Alignment ──────────────────────────
+    // If the Judge explicitly set a HIGH/CRITICAL level, trust it and
+    // escalate the numeric score to match (prevents the old bug where
+    // a stale low score silently crushed the Judge's escalation).
+    if (level === 'critical' && score < 8) score = 8;
+    if (level === 'high' && score < 6)     score = 6;
+    // Conversely, if the score is high but the level is low, escalate level
+    if (score >= 8 && level === 'low')     level = 'critical';
+    if (score >= 6 && score < 8 && level === 'low') level = 'high';
     
     let resultObj = {
       id: baseAnalysis.id,
@@ -308,6 +384,9 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     
     // Apply Downstream Leak Calibration
     resultObj = cleanMixedMatrixDownstreamLeaks(resultObj, clauseTextMap[baseAnalysis.id] || "");
+
+    // V5 Predatory Trap Escalation (deterministic safety net)
+    resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
     // Sanitize law refs mapped to strict schema keys
     resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
