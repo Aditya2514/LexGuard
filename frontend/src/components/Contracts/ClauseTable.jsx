@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getClausesDetailed } from '../../api/lexguardClient';
+import { diffWords } from 'diff';
 import RiskBadge from './RiskBadge';
 import './ClauseTable.css';
 
@@ -194,6 +195,14 @@ export default function ClauseTable({ contractId, contractStatus }) {
 /* ── Individual Clause Row ───────────────────────────────────────────── */
 
 function ClauseRow({ clause, isExpanded, onToggle }) {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(clause.suggested_rewrite);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
   const preview =
     clause.rawText?.length > 200
       ? clause.rawText.slice(0, 200) + '…'
@@ -294,17 +303,25 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
               {clause.suggested_rewrite && (
                 <div className="expanded-section rewrite-section">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                    <h4 className="expanded-label" style={{ marginBottom: 0, color: '#10b981' }}>✍️ Suggested Fair Rewrite</h4>
+                    <h4 className="expanded-label" style={{ marginBottom: 0, color: '#10b981' }}>✍️ Suggested Fair Rewrite (Visual Diff)</h4>
                     <button 
-                      className="copy-rewrite-btn"
-                      onClick={() => navigator.clipboard.writeText(clause.suggested_rewrite)}
+                      className={`copy-rewrite-btn ${isCopied ? 'copied' : ''}`}
+                      onClick={handleCopy}
                     >
-                      Copy Text
+                      {isCopied ? '✅ Copied!' : '📋 Copy Counter-Clause'}
                     </button>
                   </div>
                   <div className="rewrite-box">
-                    <p className="expanded-text" style={{ fontStyle: 'italic', margin: 0 }}>
-                      "{clause.suggested_rewrite}"
+                    <p className="expanded-text" style={{ fontStyle: 'italic', margin: 0, lineHeight: '1.6' }}>
+                      {diffWords(clause.rawText || '', clause.suggested_rewrite || '').map((part, index) => {
+                        if (part.added) {
+                          return <span key={index} className="diff-addition">{part.value}</span>;
+                        }
+                        if (part.removed) {
+                          return <span key={index} className="diff-deletion">{part.value}</span>;
+                        }
+                        return <span key={index}>{part.value}</span>;
+                      })}
                     </p>
                   </div>
                 </div>
