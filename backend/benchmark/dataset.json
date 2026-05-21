@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC_001_NON_COMPETE_PREDATORY",
+    "text": "Upon separation from the Company for any reason, the Employee is strictly barred from working for, consulting with, or advising any logistics or technology firm globally for an absolute and indefinite duration.",
+    "expected_type": "non_compete",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 of the Indian Contract Act, 1872 - Absolute post-employment restraint of trade."
+  },
+  {
+    "id": "TC_002_NON_COMPETE_SAFE_HARBOR",
+    "text": "During the active term of employment, the Employee shall devote their entire working time and attention exclusively to the business of the Company and shall not engage in any competing commercial activities.",
+    "expected_type": "non_compete",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Niranjan Shankar Golikari Precedent - Active term exclusivity covenants are fully valid."
+  },
+  {
+    "id": "TC_003_ARBITRATION_UNILATERAL",
+    "text": "All disputes arising out of this agreement shall be settled via binding arbitration. The Company reserves the exclusive, unilateral right to nominate, select, and finalize the Sole Arbitrator.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Section 12(5) read with Seventh Schedule of Arbitration Act - Unilateral appointment bias."
+  },
+  {
+    "id": "TC_004_WAGE_DEDUCTION_PUNITIVE",
+    "text": "The Company shall withhold 25% of the Employee's gross monthly compensation as a performance contingency reserve. This accumulated balance shall be permanently forfeited if the Employee leaves before 36 months.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act and Payment of Wages Act - Unenforceable penalty and illegal retention."
+  },
+  {
+    "id": "TC_005_COPYRIGHT_WAIVER_TRAP",
+    "text": "The Employee hereby waives all statutory reversionary rights under Section 19(4) of the Copyright Act. Even if the Company fails to exploit the software for over one year, ownership shall not revert to the Employee.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Section 19(4) of the Copyright Act, 1957 - Predatory statutory contracting-out."
+  }
+]

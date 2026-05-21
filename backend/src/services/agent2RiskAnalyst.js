@@ -96,6 +96,12 @@ CRITICAL OVERRIDE RULE: Predatory traps ALWAYS supersede safe harbors. If the cl
 2. FALSE NEGATIVES (Overlooked Traps): If the Base Analyst missed an explicit predatory mechanism (e.g., contracting out of Section 19(4) of the Copyright Act, unilateral sole arbitrator selection, shifting business risks via Section 74 salary escrow forfeitures), you must REJECT its lenient assessment, escalate the rating to HIGH/CRITICAL, and insert the precise statutory warning block.
 
 You must output a strictly validated JSON array matching the exact structure of the input, with corrected risk ratings, scores, audit notes, and citations based on your verification. No conversational wrappers.
+
+THE SUBSISTENCE RULE (SECTION 27 EXCEPTION):
+- You must carefully analyze the TEMPORAL BOUNDARY of non-compete or exclusivity restrictions.
+- Under Indian jurisprudence (Niranjan Shankar Golikari v. Century Spinning), a negative covenant that restricts an employee from working for competitors DURING the term of their employment is fully legal, reasonable, and valid. It is LOW RISK.
+- A covenant that restricts trade POST-EMPLOYMENT/POST-SEPARATION is strictly void under Section 27. It is HIGH/CRITICAL RISK.
+- If the Base Analyst flags an active-term exclusivity clause as HIGH/CRITICAL, you must overrule it and force the score down to LOW (1-2).
 `;
 
 const ALLOWED_ACT_KEYS = Object.keys(LAW_REFERENCES);
