@@ -222,67 +222,37 @@ function cleanMixedMatrixDownstreamLeaks(clauseObj, text) {
     return clauseObj;
 }
 
-// ── V5 Deterministic Predatory Trap Escalation ───────────────────────────────
+// ── V6 Deterministic Predatory Trap Escalation ───────────────────────────────
 // Safety net: catches sophisticated predatory patterns that the LLM consistently
-// rates as LOW because they use polished legal language to disguise the trap.
+// rates as LOW/HIGH because they use polished legal language to disguise the trap.
 // Runs AFTER the LLM and Judge as a hard-coded escalation layer.
+// Now uses deterministic keyword matching (V6) instead of unreliable ML models.
 function enforcePredatoryTrapEscalation(clauseObj, text) {
-    const raw = text.toLowerCase();
+    const { detectPredatoryTraps } = require('./classifierService');
+    
+    // Use deterministic keyword pattern matching to detect traps
+    const detectedTraps = detectPredatoryTraps(text);
 
-    // 1. Unilateral Force Majeure: Company suspends its obligations but
-    //    contractor/employee obligations remain "absolute" or "unmodified"
-    if ((raw.includes('force majeure') || raw.includes('act of god') || raw.includes('pandemic')) &&
-        (raw.includes('suspended') || raw.includes('shall be suspended')) &&
-        (raw.includes('absolute') || raw.includes('unmodified') || raw.includes('remains in full'))) {
-        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
-            clauseObj.risk_level = 'critical';
-            clauseObj.risk_score = 9;
+    if (detectedTraps.length > 0) {
+        // Find the highest severity trap in the detected list
+        const hasCritical = detectedTraps.some(t => t.severity === 'critical');
+        const hasHigh = detectedTraps.some(t => t.severity === 'high');
+        
+        const targetLevel = hasCritical ? 'critical' : (hasHigh ? 'high' : 'medium');
+        const targetScore = hasCritical ? 9 : (hasHigh ? 8 : 6);
+        
+        // Only escalate if the target level is higher than the current level
+        const currentScore = parseInt(clauseObj.risk_score, 10) || 5;
+        if (targetScore > currentScore) {
+            clauseObj.risk_level = targetLevel;
+            clauseObj.risk_score = targetScore;
+            
+            const trapTypes = detectedTraps.map(t => t.type).join(', ');
             clauseObj.risk_reasons = [
-                'One-sided force majeure clause: Company suspends its payment obligations during force majeure events, but the counterparty must continue performing. This creates a severe lack of mutuality.',
+                `🚨 [System Override] Deterministic detector identified: ${trapTypes}. Forced escalation to ${targetLevel.charAt(0).toUpperCase() + targetLevel.slice(1)}.`,
                 ...(clauseObj.risk_reasons || [])
             ];
-        }
-    }
-
-    // 2. Pre-existing IP Capture: Assigns IP created BEFORE employment,
-    //    especially with a blank or missing Exhibit
-    if ((raw.includes('prior to the commencement') || raw.includes('prior to employment') || raw.includes('pre-existing')) &&
-        (raw.includes('assigns') || raw.includes('assign') || raw.includes('rights, title')) &&
-        (raw.includes('intellectual property') || raw.includes('invention'))) {
-        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
-            clauseObj.risk_level = 'critical';
-            clauseObj.risk_score = 9;
-            clauseObj.risk_reasons = [
-                'Sweeping capture of pre-existing intellectual property: This clause attempts to seize IP created before the employment relationship began, potentially without separate consideration. Exhibit exclusion lists left blank effectively capture everything.',
-                ...(clauseObj.risk_reasons || [])
-            ];
-        }
-    }
-
-    // 3. Indemnification covering gross negligence / willful misconduct
-    if ((raw.includes('indemnify') || raw.includes('indemnification') || raw.includes('hold harmless')) &&
-        (raw.includes('gross negligence') || raw.includes('willful misconduct') || raw.includes('wilful misconduct'))) {
-        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium') {
-            clauseObj.risk_level = 'critical';
-            clauseObj.risk_score = 9;
-            clauseObj.risk_reasons = [
-                'Unconscionable indemnification: This clause requires the indemnitor to cover losses arising from the indemnitee\'s own gross negligence or willful misconduct. Indian courts may view this as contrary to public policy under Section 23 of the Indian Contract Act.',
-                ...(clauseObj.risk_reasons || [])
-            ];
-        }
-    }
-
-    // 4. Punitive wage forfeiture: withholding salary and permanent forfeiture
-    if ((raw.includes('withhold') || raw.includes('deduct') || raw.includes('reserve')) &&
-        (raw.includes('forfeited') || raw.includes('forfeiture') || raw.includes('permanently')) &&
-        (raw.includes('compensation') || raw.includes('salary') || raw.includes('wages'))) {
-        if (clauseObj.risk_level === 'low' || clauseObj.risk_level === 'medium' || clauseObj.risk_level === 'high') {
-            clauseObj.risk_level = 'critical';
-            clauseObj.risk_score = 9;
-            clauseObj.risk_reasons = [
-                'Punitive wage forfeiture mechanism: Withholding a portion of earned compensation and permanently forfeiting it constitutes an unenforceable penalty under Section 74 of the Indian Contract Act, and may violate the Payment of Wages Act.',
-                ...(clauseObj.risk_reasons || [])
-            ];
+            console.log(`🛡️ [Guardrail Triggered] Clause ${clauseObj.id}: Overriding to ${targetLevel}(${targetScore}) due to ML trap detection.`);
         }
     }
 
@@ -349,7 +319,7 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
   }
   
   // Merge and normalize results
-  const finalResults = baseResults.map((baseAnalysis) => {
+  const finalResults = await Promise.all(baseResults.map(async (baseAnalysis) => {
     // Find verified analysis if it exists, otherwise use base
     const verifiedAnalysis = verifiedRiskyResults.find(v => v.id === baseAnalysis.id) || baseAnalysis;
     
@@ -385,14 +355,14 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     // Apply Downstream Leak Calibration
     resultObj = cleanMixedMatrixDownstreamLeaks(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
-    // V5 Predatory Trap Escalation (deterministic safety net)
+    // V6 Predatory Trap Escalation (deterministic safety net)
     resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
     // Sanitize law refs mapped to strict schema keys
     resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
 
     return resultObj;
-  });
+  }));
 
   return finalResults;
 }

@@ -29,6 +29,10 @@ const clauseSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Raw clause text is required'],
     },
+    embedding: {
+      type: [Number],
+      default: null, // Stores 384-dimensional vector from HF all-MiniLM-L6-v2
+    },
 
     // ── Phase 2: Agent 1 – Clause Extractor ──────────────────────────────
     // NOTE: null is intentional default for all agent fields.

@@ -32,7 +32,19 @@ const extractText = async (filePath, originalName) => {
 
   try {
     if (ext === '.pdf') {
-      rawText = await parsePdf(filePath);
+      try {
+        const { parseWithLlama } = require('./llamaParseService');
+        console.log('📄 Attempting LlamaParse extraction...');
+        rawText = await parseWithLlama(filePath);
+        if (rawText && rawText.trim().length > 0) {
+          console.log(`✅ LlamaParse extraction successful.`);
+        } else {
+          throw new Error('LlamaParse returned empty text');
+        }
+      } catch (llamaErr) {
+        console.warn(`⚠️ LlamaParse failed or not configured (${llamaErr.message}). Falling back to pdf-parse...`);
+        rawText = await parsePdf(filePath);
+      }
     } else if (ext === '.docx') {
       rawText = await parseDocx(filePath);
     }
