@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://adity251105-lexguard-backend.hf.space/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
