@@ -62,7 +62,9 @@ async function processContractJob(contractId) {
     await Promise.all([
       generateUserAdvocateForContract(contractId),
       runComplianceCheckForContract(contractId),
-      embedClausesForContract(contractId)
+      embedClausesForContract(contractId).catch(err => {
+        console.error(`⚠️  Non-fatal: Clause embedding failed, skipping RAG index creation: ${err.message}`);
+      })
     ]);
 
     // 5. Finalize overall contract risk rating

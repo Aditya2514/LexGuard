@@ -381,7 +381,7 @@ function ComplianceBadge({ level }) {
 
 function ClauseTypeBadge({ type }) {
   const normType = (type || 'other').toLowerCase();
-  let icon = '📄';
+  let icon;
   let label = normType.replace(/_/g, ' ');
 
   switch (normType) {
