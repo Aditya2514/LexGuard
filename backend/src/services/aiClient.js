@@ -414,23 +414,18 @@ async function callLLM({
     }
   };
 
+  // Upgrade 1: Multi-Provider LLM Cascade (Accuracy-Based Priority)
+  // Regardless of env var, we prioritize by legal reasoning accuracy:
+  // 1. Gemini (Best accuracy, 1M context)
+  // 2. Groq (Fastest, good reasoning with Llama 3)
+  // 3. HuggingFace (Good fallback with Qwen)
+  // 4. Grok
   const providers = [];
-  if (primaryProvider === 'groq') {
-    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY });
-    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
-    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
-  } else if (primaryProvider === 'huggingface') {
-    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY });
-    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
-  } else {
-    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
-    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
-  }
+  providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
+  providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+  providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+  providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY });
+  providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
 
   const activeProviders = providers.filter(p => p.available);
   let lastError = null;

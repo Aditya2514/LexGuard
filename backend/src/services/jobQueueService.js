@@ -53,11 +53,16 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 45, 'Analyzing risks and statutory touchpoints (Agent 2: Risk Analyst)');
     await analyseRisksForContract(contractId);
 
-    // 4. Run Agent 3 & Agent 4 Concurrently
-    await updateJobProgress(contractId, 70, 'Generating plain-language guides and checking Indian law compliance (Agent 3 & 4)');
+    // 4. Run Agent 3, Agent 4 & Embeddings Concurrently
+    await updateJobProgress(contractId, 70, 'Generating plain-language guides, checking Indian law, and building RAG index');
+    
+    // Lazy load embeddingService to avoid circular deps
+    const { embedClausesForContract } = require('./embeddingService');
+
     await Promise.all([
       generateUserAdvocateForContract(contractId),
       runComplianceCheckForContract(contractId),
+      embedClausesForContract(contractId)
     ]);
 
     // 5. Finalize overall contract risk rating

@@ -24,18 +24,54 @@ You are provided with the FULL TEXT of the contract clauses below, along with th
 `;
 
 async function chatWithContract(contractId, userMessage) {
-  // Fetch all clauses for context
-  const clauses = await Clause.find({ contractId }).sort({ segmentIndex: 1 });
-  if (!clauses || clauses.length === 0) {
-    throw new Error('No clauses found for this contract. Please ensure it has been analyzed.');
-  }
+  const { generateEmbedding } = require('./embeddingService');
 
-  // Build the context string
-  let contextText = clauses.map(c => `[Clause ${c.segmentIndex + 1} - Type: ${c.clause_type || 'Unknown'}]\n${c.rawText}`).join('\n\n');
+  let contextText = '';
+  try {
+    // Generate embedding for the user's question
+    const queryVector = await generateEmbedding(userMessage);
 
-  // Truncate if insanely long (prevent token overflow)
-  if (contextText.length > 50000) {
-    contextText = contextText.substring(0, 50000) + '\\n...[TRUNCATED]';
+    // Perform vector search to find the top 5 most relevant clauses
+    // Note: Requires an Atlas Vector Search index named "vector_index" on the "clauses" collection
+    const relevantClauses = await Clause.aggregate([
+      {
+        $vectorSearch: {
+          index: "vector_index",
+          path: "embedding",
+          queryVector: queryVector,
+          numCandidates: 50,
+          limit: 5,
+          filter: { contractId: contractId }
+        }
+      },
+      {
+        $project: {
+          segmentIndex: 1,
+          clause_type: 1,
+          rawText: 1,
+          risk_level: 1,
+          plain_language_explanation: 1,
+          score: { $meta: "vectorSearchScore" }
+        }
+      }
+    ]);
+
+    if (relevantClauses && relevantClauses.length > 0) {
+      contextText = relevantClauses.map(c => 
+        `[Clause ${c.segmentIndex + 1} - Type: ${c.clause_type || 'Unknown'} - Risk: ${c.risk_level || 'Unknown'}]\n${c.rawText}\nExplanation: ${c.plain_language_explanation || ''}`
+      ).join('\n\n');
+    } else {
+      contextText = 'No highly relevant clauses found for this query.';
+    }
+  } catch (err) {
+    console.warn('⚠️ Vector search failed, falling back to full text context.', err.message);
+    
+    // Fallback: use first 20 clauses to avoid overflowing token limit
+    const clauses = await Clause.find({ contractId }).sort({ segmentIndex: 1 }).limit(20);
+    if (!clauses || clauses.length === 0) {
+      throw new Error('No clauses found for this contract. Please ensure it has been analyzed.');
+    }
+    contextText = clauses.map(c => `[Clause ${c.segmentIndex + 1} - Type: ${c.clause_type || 'Unknown'}]\n${c.rawText}`).join('\n\n');
   }
 
   const userContent = JSON.stringify({
