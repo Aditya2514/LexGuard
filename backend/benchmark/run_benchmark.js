@@ -86,9 +86,9 @@ async function startBenchmarkRunner() {
 
   let detailedResultsMarkdown = `\n## Detailed Per-TestCase Audit Telemetry\n\n| Test ID | Expected Type / Risk | AI Type / Risk | Status | Rewrite Quality (1-10) |\n| :--- | :--- | :--- | :--- | :--- |\n`;
 
-    for (const tc of dataset) {
-      console.log(`\n🔎 [Testing] ID: ${tc.id}`);
-      await wait(8000); // Steady operational pacing delay to prevent rate limit fires
+  for (const tc of dataset) {
+    console.log(`\n🔎 [Testing] ID: ${tc.id}`);
+    await wait(8000); // Steady operational pacing delay to prevent rate limit fires
 
     try {
       const mockId = new mongoose.Types.ObjectId().toString();

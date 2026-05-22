@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const User = require('./models/User');
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 7860;
 
 // ── Database ─────────────────────────────────────────────────────────────────
