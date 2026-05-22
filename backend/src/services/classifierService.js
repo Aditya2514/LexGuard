@@ -111,6 +111,28 @@ function detectPredatoryTraps(text) {
         detectedTraps.push({ type: 'wage forfeiture', severity: 'critical' });
     }
     
+    // ── Pattern 13: Post-Employment Non-Compete Restraint ───────────────
+    const hasPostEmploymentTerm = (
+        lower.includes('upon separation') || 
+        lower.includes('post-employment') || 
+        lower.includes('after termination') ||
+        lower.includes('after separation') ||
+        lower.includes('following termination') ||
+        lower.includes('leaves the company') ||
+        lower.includes('leaving the company')
+    );
+    const hasRestraintTerm = (
+        lower.includes('non-compete') ||
+        lower.includes('barred from working') ||
+        lower.includes('not work for') ||
+        lower.includes('not engage') ||
+        lower.includes('restricted from') ||
+        lower.includes('shall not compete')
+    );
+    if (hasPostEmploymentTerm && hasRestraintTerm) {
+        detectedTraps.push({ type: 'post-employment non-compete', severity: 'critical' });
+    }
+    
     // ═══════════════════════════════════════════════════════════════════════
     // HIGH-SEVERITY PATTERNS (force escalation to risk_level=high)
     // ═══════════════════════════════════════════════════════════════════════
