@@ -72,14 +72,35 @@ async function runAgent1ClauseExtractor(clausesBatch) {
     maxTokens: 2048,
   });
 
-  // Validate and sanitise (ensure only valid ObjectIds are bulk-written to avoid DB CastError)
-  const results = (resp.results || [])
-    .filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id))
-    .map((r) => ({
-      id: r.id,
-      clause_type: CLAUSE_TYPES.includes(r.clause_type) ? r.clause_type : 'other',
-      category_tags: Array.isArray(r.category_tags) ? r.category_tags : [],
-    }));
+  const results = [];
+  const rawResults = resp.results || [];
+  
+  for (let i = 0; i < clausesBatch.length; i++) {
+    const originalClause = clausesBatch[i];
+    let matched = rawResults.find(r => r && String(r.id) === String(originalClause.id));
+    
+    if (!matched && rawResults.length === clausesBatch.length) {
+      matched = rawResults[i];
+    }
+    
+    if (!matched && clausesBatch.length === 1 && rawResults.length > 0) {
+      matched = rawResults[0];
+    }
+    
+    if (matched) {
+      results.push({
+        id: originalClause.id,
+        clause_type: CLAUSE_TYPES.includes(matched.clause_type) ? matched.clause_type : 'other',
+        category_tags: Array.isArray(matched.category_tags) ? matched.category_tags : [],
+      });
+    } else {
+      results.push({
+        id: originalClause.id,
+        clause_type: 'other',
+        category_tags: [],
+      });
+    }
+  }
 
   return results;
 }

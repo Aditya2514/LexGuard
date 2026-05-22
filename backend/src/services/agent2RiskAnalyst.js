@@ -309,7 +309,36 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     clauseTextMap[c.id] = c.text;
   }
 
-  const baseResults = (resp.results || []).filter((r) => r && r.id && mongoose.Types.ObjectId.isValid(r.id));
+  const rawResults = resp.results || [];
+  const baseResults = [];
+  
+  for (let i = 0; i < clausesBatch.length; i++) {
+    const originalClause = clausesBatch[i];
+    let matched = rawResults.find(r => r && String(r.id) === String(originalClause.id));
+    
+    if (!matched && rawResults.length === clausesBatch.length) {
+      matched = rawResults[i];
+    }
+    
+    if (!matched && clausesBatch.length === 1 && rawResults.length > 0) {
+      matched = rawResults[0];
+    }
+    
+    if (matched) {
+      baseResults.push({
+        ...matched,
+        id: originalClause.id,
+      });
+    } else {
+      baseResults.push({
+        id: originalClause.id,
+        risk_level: 'medium',
+        risk_score: 5,
+        risk_reasons: ['Base analyst did not return results for this clause.'],
+        possible_law_references: [],
+      });
+    }
+  }
   
   // Adversarial Judge: run judge on all clauses to catch both False Positives and False Negatives
   const riskyResults = baseResults;
@@ -323,15 +352,35 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     
     // Batch run the judge
     const judgeRaw = await runAdversarialJudgeBatch(globalContext, riskyClauseTextMap, riskyResults);
-    const judgeArray = Array.isArray(judgeRaw) ? judgeRaw : [];
+    const rawJudgeResults = Array.isArray(judgeRaw) ? judgeRaw : (judgeRaw.results || []);
     
-    verifiedRiskyResults = judgeArray;
+    for (let i = 0; i < baseResults.length; i++) {
+      const baseResult = baseResults[i];
+      let matched = rawJudgeResults.find(v => v && String(v.id) === String(baseResult.id));
+      
+      if (!matched && rawJudgeResults.length === baseResults.length) {
+        matched = rawJudgeResults[i];
+      }
+      
+      if (!matched && baseResults.length === 1 && rawJudgeResults.length > 0) {
+        matched = rawJudgeResults[0];
+      }
+      
+      if (matched) {
+        verifiedRiskyResults.push({
+          ...matched,
+          id: baseResult.id,
+        });
+      } else {
+        verifiedRiskyResults.push(baseResult);
+      }
+    }
   }
   
   // Merge and normalize results
-  const finalResults = await Promise.all(baseResults.map(async (baseAnalysis) => {
+  const finalResults = await Promise.all(baseResults.map(async (baseAnalysis, index) => {
     // Find verified analysis if it exists, otherwise use base
-    const verifiedAnalysis = verifiedRiskyResults.find(v => v.id === baseAnalysis.id) || baseAnalysis;
+    const verifiedAnalysis = verifiedRiskyResults[index] || baseAnalysis;
     
     const risk_score = verifiedAnalysis.risk_score !== undefined ? verifiedAnalysis.risk_score : (verifiedAnalysis.score !== undefined ? verifiedAnalysis.score : baseAnalysis.risk_score);
     const risk_level = verifiedAnalysis.risk_level || verifiedAnalysis.riskRating || baseAnalysis.risk_level;
