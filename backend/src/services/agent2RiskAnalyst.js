@@ -219,6 +219,16 @@ function cleanMixedMatrixDownstreamLeaks(clauseObj, text) {
         }
     }
 
+    // 3. Defang False Positives on Mutual/Bilateral Indemnification (TC_019)
+    if ((rawText.includes("indemnify") || rawText.includes("indemnification")) &&
+        (rawText.includes("each party") || rawText.includes("indemnifying party's") || rawText.includes("mutual")) &&
+        !rawText.includes("sole negligence") && !rawText.includes("own negligence")) {
+        clauseObj.risk_level = "low";
+        clauseObj.risk_score = 1;
+        clauseObj.risk_reasons = ["Standard mutual, bilateral indemnification restricted to each party's own gross negligence or misconduct. Balanced risk allocation."];
+        clauseObj.possible_law_references = [];
+    }
+
     return clauseObj;
 }
 

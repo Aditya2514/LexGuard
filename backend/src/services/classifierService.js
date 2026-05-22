@@ -78,7 +78,13 @@ function detectPredatoryTraps(text) {
         lower.includes('gross negligence') || 
         lower.includes('willful misconduct')
     );
-    if (hasIndemnifyVerb && coversOwnFault) {
+    // Exclude safe harbors where it says "indemnifying party's gross negligence" or "each party"
+    const isMutualOrStandard = (
+        lower.includes("indemnifying party's") || 
+        lower.includes("each party agrees to indemnify")
+    );
+    
+    if (hasIndemnifyVerb && coversOwnFault && !isMutualOrStandard) {
         detectedTraps.push({ type: 'one-sided indemnification', severity: 'critical' });
     }
     
@@ -132,6 +138,120 @@ function detectPredatoryTraps(text) {
     );
     if (hasTerminationClause && hasUnilateralConvenience && hasPaymentDenial) {
         detectedTraps.push({ type: 'termination without payment', severity: 'high' });
+    }
+    
+    // ── Pattern 6: Unilateral Contract Variation ─────────────────────────
+    // Detects: Employer claims right to alter salary/benefits at any time without notice.
+    const hasVariationTrigger = (
+        lower.includes('unilaterally modify') || 
+        lower.includes('unilaterally alter') || 
+        lower.includes('absolute right to modify') ||
+        lower.includes('reserve the right to modify')
+    );
+    const hasCoreTarget = (
+        lower.includes('salary') || 
+        lower.includes('benefits') || 
+        lower.includes('compensation')
+    );
+    const hasNoNotice = (
+        lower.includes('at any time') || 
+        lower.includes('with or without notice') ||
+        lower.includes('without prior notice')
+    );
+    if (hasVariationTrigger && hasCoreTarget && hasNoNotice) {
+        detectedTraps.push({ type: 'unilateral contract variation', severity: 'critical' });
+    }
+
+    // ── Pattern 7: Mandatory Arbitration for Harassment (POSH Trap) ──────
+    // Detects: Forcing sexual harassment claims into private arbitration.
+    const hasHarassment = (
+        lower.includes('sexual harassment') || 
+        lower.includes('posh') || 
+        lower.includes('discrimination')
+    );
+    const hasArbitrationMandate = (
+        lower.includes('subject exclusively to') || 
+        lower.includes('binding arbitration') || 
+        lower.includes('private arbitration')
+    );
+    if (hasHarassment && hasArbitrationMandate) {
+        detectedTraps.push({ type: 'illegal harassment arbitration', severity: 'critical' });
+    }
+
+    // ── Pattern 8: Punitive Training Bond / Penalty ──────────────────────
+    // Detects: Fixed penalty or liquidated damages instead of genuine pre-estimate.
+    const hasBondTrigger = (
+        lower.includes('training') || 
+        lower.includes('incur substantial costs') ||
+        lower.includes('resigns within')
+    );
+    const hasPenalty = (
+        lower.includes('fixed penalty') || 
+        lower.includes('liquidated damages') || 
+        lower.includes('pay a penalty')
+    );
+    const hasDisregardForActual = (
+        lower.includes('regardless of the actual') || 
+        lower.includes('irrespective of') ||
+        lower.includes('without proof of actual')
+    );
+    if (hasBondTrigger && hasPenalty && hasDisregardForActual) {
+        detectedTraps.push({ type: 'punitive training bond', severity: 'critical' });
+    }
+
+    // ── Pattern 9: Unpaid Indefinite Suspension ──────────────────────────
+    // Detects: Suspending without pay indefinitely.
+    const hasSuspension = (
+        lower.includes('unpaid disciplinary suspension') || 
+        lower.includes('suspended without pay')
+    );
+    const hasIndefinite = (
+        lower.includes('indefinite duration') || 
+        lower.includes('sole discretion') || 
+        lower.includes('pending any')
+    );
+    if (hasSuspension && hasIndefinite) {
+        detectedTraps.push({ type: 'unpaid indefinite suspension', severity: 'critical' });
+    }
+
+    // ── Pattern 10: Oppressive Foreign Jurisdiction ──────────────────────
+    const hasForeign = (
+        lower.includes('delaware') || 
+        lower.includes('new york') || 
+        lower.includes('singapore')
+    );
+    const hasExclusive = (
+        lower.includes('exclusive jurisdiction') || 
+        lower.includes('courts located in') || 
+        lower.includes('governed by the laws')
+    );
+    if (hasForeign && hasExclusive) {
+        // Technically high or critical, we'll mark it high for now unless explicitly oppressive
+        detectedTraps.push({ type: 'foreign jurisdiction trap', severity: 'high' });
+    }
+    
+    // ── Pattern 11: Broad Non-Solicit / Backdoor Non-Compete ────────────
+    const hasSolicit = (
+        lower.includes('not directly or indirectly solicit') || 
+        lower.includes('accept business from')
+    );
+    const hasGlobalScope = (
+        lower.includes('anywhere in the world') || 
+        lower.includes('any client, customer, or prospect')
+    );
+    if (hasSolicit && hasGlobalScope) {
+        detectedTraps.push({ type: 'broad non-solicit restraint', severity: 'critical' });
+    }
+
+    // ── Pattern 12: Indefinite Probation ─────────────────────────────────
+    const hasProbation = lower.includes('probation');
+    const hasIndefiniteExtension = (
+        lower.includes('extend this probation period indefinitely') || 
+        lower.includes('extend indefinitely')
+    );
+    const hasTerminationWithoutCause = lower.includes('terminated without notice or cause');
+    if (hasProbation && hasIndefiniteExtension && hasTerminationWithoutCause) {
+        detectedTraps.push({ type: 'indefinite probation trap', severity: 'high' });
     }
     
     return detectedTraps;
