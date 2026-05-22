@@ -70,5 +70,93 @@
     "expected_risk": "HIGH",
     "expected_violation": true,
     "legal_hook": "Forfeiture of Earned Wages/Fees - Termination for convenience without payment for rendered services."
+  },
+  {
+    "id": "TC_010_TRAINING_BOND_PENALTY",
+    "text": "The Employee acknowledges that the Company will incur substantial costs for training. If the Employee resigns within 24 months, they agree to pay a fixed penalty of INR 5,00,000 as liquidated damages, regardless of the actual training cost.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act - Unenforceable penalty in terrorem instead of genuine pre-estimate of loss."
+  },
+  {
+    "id": "TC_011_NON_SOLICIT_BROAD",
+    "text": "For a period of 5 years following termination, the Employee shall not directly or indirectly solicit, accept business from, or deal with any client, customer, or prospect of the Company anywhere in the world.",
+    "expected_type": "non_solicitation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 of the Contract Act - Broad non-solicit functioning as an illegal restraint of trade."
+  },
+  {
+    "id": "TC_012_UNILATERAL_VARIATION",
+    "text": "The Company reserves the absolute right to unilaterally modify, reduce, or alter the Employee's salary, benefits, or work location at any time, with or without notice.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Payment of Wages Act / Contract Act - Unilateral retrospective modification of core consideration."
+  },
+  {
+    "id": "TC_013_FOREIGN_JURISDICTION",
+    "text": "This Agreement shall be governed by the laws of the State of Delaware, USA. The Employee consents to the exclusive jurisdiction of the courts located in Wilmington, Delaware for all disputes.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Oppressive Jurisdiction - Forcing a local employee into an unaffordable foreign jurisdiction."
+  },
+  {
+    "id": "TC_014_INDEFINITE_PROBATION",
+    "text": "The Employee shall be on probation for an initial period of 6 months. The Company may extend this probation period indefinitely at its sole discretion, during which time the Employee may be terminated without notice or cause.",
+    "expected_type": "termination",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Industrial Disputes Act - Indefinite probation undermining statutory retrenchment rights."
+  },
+  {
+    "id": "TC_015_MANDATORY_ARBITRATION_CRIMINAL",
+    "text": "Any and all disputes, claims, or controversies arising out of the employment, including but not limited to claims of sexual harassment, discrimination, or statutory violations, shall be subject exclusively to private, confidential binding arbitration.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "POSH Act / Public Policy - Attempting to force criminal or statutory harassment claims into private arbitration."
+  },
+  {
+    "id": "TC_016_EXCLUSIVITY_SAFE_HARBOR",
+    "text": "During regular working hours, the Employee agrees to devote their full attention to the Company. The Employee may engage in outside freelancing during weekends provided it does not involve any direct competitors.",
+    "expected_type": "other",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Valid active-term exclusivity with safe harbor for non-competing moonlighting."
+  },
+  {
+    "id": "TC_017_TRAINING_BOND_SAFE_HARBOR",
+    "text": "If the Company sponsors an external certification for the Employee, and the Employee resigns within 12 months, the Employee agrees to reimburse the exact, pro-rated actual cost of the certification course as evidenced by invoices.",
+    "expected_type": "compensation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Valid indemnification for actual, proven, pro-rated training costs."
+  },
+  {
+    "id": "TC_018_IP_WORK_FOR_HIRE_SAFE_HARBOR",
+    "text": "All intellectual property created by the Employee during their normal working hours, using Company equipment, or strictly related to the Company's active business, shall be the sole property of the Company.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Standard compliant work-for-hire doctrine limited to employment scope."
+  },
+  {
+    "id": "TC_019_MUTUAL_INDEMNIFICATION_SAFE_HARBOR",
+    "text": "Each party agrees to indemnify and hold harmless the other party against direct damages arising out of the indemnifying party's gross negligence or willful misconduct in the performance of this agreement.",
+    "expected_type": "indemnification",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Mutual, fault-based indemnification avoiding unconscionable risk transfer."
+  },
+  {
+    "id": "TC_020_UNPAID_SUSPENSION",
+    "text": "The Company may place the Employee on an unpaid disciplinary suspension for an indefinite duration pending any internal investigation, during which time the Employee may not seek alternative employment.",
+    "expected_type": "other",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Payment of Wages Act / Contract Act - Deprivation of livelihood and illegal restraint."
   }
 ]

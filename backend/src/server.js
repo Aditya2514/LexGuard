@@ -18,7 +18,10 @@ const PORT = process.env.PORT || 7860;
 connectDB();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(helmet({
+  frameguard: false,
+  contentSecurityPolicy: false,
+}));
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
@@ -38,6 +41,15 @@ app.use(express.urlencoded({ extended: true, limit: '11mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/payments', paymentRoutes);
+
+// Root landing endpoint to prevent 404 in Hugging Face Space iframe
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Welcome to LexGuard API backend. Use /health for service health status.',
+    documentation: 'https://github.com/Aditya2514/LexGuard',
+  });
+});
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
