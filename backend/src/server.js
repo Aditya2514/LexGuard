@@ -142,9 +142,7 @@ if (!process.env.VERCEL) {
     const jobQueueService = require('./services/jobQueueService');
     jobQueueService.startQueueWorker();
     
-    // Warm embedding cache
-    const { warmEmbeddingCache } = require('./services/lawRetrieverService');
-    warmEmbeddingCache();
+    // Removed warmEmbeddingCache as it is no longer used
     
     // Daily quota reset cron (runs every hour)
     setInterval(async () => {

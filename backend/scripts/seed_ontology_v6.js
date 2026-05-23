@@ -17,6 +17,21 @@ const ONTOLOGY_SEED_DATA = [
     contractType: "SaaS_Vendor",
     clauseType: "intellectual_property",
     targetDomains: ["intellectual_property_law", "corporate_compliance"]
+  },
+  {
+    contractType: "Real_Estate",
+    clauseType: "possession_delay",
+    targetDomains: ["real_estate_law", "general_contract_law"]
+  },
+  {
+    contractType: "Corporate",
+    clauseType: "tax_liability",
+    targetDomains: ["taxation_law"]
+  },
+  {
+    contractType: "Investment",
+    clauseType: "insider_trading",
+    targetDomains: ["financial_securities_law"]
   }
 ];
 
