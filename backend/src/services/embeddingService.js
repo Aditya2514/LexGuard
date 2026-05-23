@@ -10,7 +10,7 @@ async function generateEmbedding(text) {
   }
 
   const model = 'sentence-transformers/all-MiniLM-L6-v2';
-  const url = `https://api-inference.huggingface.co/pipeline/feature-extraction/${model}`;
+  const url = `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`;
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
