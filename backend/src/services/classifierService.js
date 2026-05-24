@@ -380,6 +380,32 @@ function detectPredatoryTraps(text) {
         detectedTraps.push({ type: 'hostile foreign jurisdiction', severity: 'critical' });
     }
 
+    // ── Pattern 23: Ghost Equity Clawback ─────────────────────────────────────────
+    const hasClawback = lower.includes("claw back") || lower.includes("cancel, revoke") || lower.includes("forfeit");
+    const hasEquity = lower.includes("vested") || lower.includes("stock options") || lower.includes("equity");
+    const hasDiscretion = lower.includes("sole") || lower.includes("absolute discretion") || lower.includes("unchallengeable");
+
+    if (hasClawback && hasEquity && hasDiscretion) {
+        detectedTraps.push({ type: 'ghost equity clawback', severity: 'critical' });
+    }
+
+    // ── Pattern 24: Biometric DPDP Waiver ─────────────────────────────────────────
+    const hasBiometric = lower.includes("polygraph") || lower.includes("retina") || lower.includes("keylogging") || lower.includes("biometric");
+    const hasDpdpWaiver = lower.includes("dpdp") || lower.includes("digital personal data protection") || lower.includes("waives any and all rights");
+
+    if (hasBiometric && hasDpdpWaiver) {
+        detectedTraps.push({ type: 'biometric dpdp waiver', severity: 'critical' });
+    }
+
+    // ── Pattern 25: Gag Order Equity Forfeiture ───────────────────────────────────
+    const hasGagOrder = lower.includes("disparaging") || lower.includes("non-disparagement") || lower.includes("negative remarks");
+    const hasPunitiveForfeiture = lower.includes("forfeiture") || lower.includes("forfeit") || lower.includes("claw back");
+    const hasVestedAssets = lower.includes("vested equity") || lower.includes("unpaid bonuses") || lower.includes("stock");
+
+    if (hasGagOrder && hasPunitiveForfeiture && hasVestedAssets) {
+        detectedTraps.push({ type: 'gag order equity forfeiture', severity: 'critical' });
+    }
+
     return detectedTraps;
 }
 
