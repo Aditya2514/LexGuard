@@ -6,8 +6,8 @@ const { runAgent2RiskAnalyst } = require('../src/services/agent2RiskAnalyst');
 const { runAgent3UserAdvocate } = require('../src/services/agent3UserAdvocate');
 const { callLLM } = require('../src/services/aiClient');
 
-const DATASET_PATH = path.join(__dirname, 'dataset.json');
-const REPORT_PATH = path.join(__dirname, 'benchmark_report.md');
+const DATASET_PATH = path.join(__dirname, 'dataset_master.json');
+const REPORT_PATH = path.join(__dirname, 'benchmark_report_master.md');
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 

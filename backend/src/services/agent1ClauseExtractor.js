@@ -28,13 +28,18 @@ Allowed clause_type values (use exactly these strings):
 CRITICAL STRUCTURAL REQUIREMENT:
 You must classify the incoming contract text strictly into one of the following exact category enums. Do NOT deviate, capitalize differently, or use synonyms:
 - "non_compete" (For non-compete, lockouts, sector restrictions)
+- "non_solicitation" (For non-poaching of employees, clients, or customers)
 - "dispute_resolution" (For mediation, arbitration, governing law, jurisdiction)
-- "compensation" (For salary, bonuses, retention, escrow forfeitures, pay metrics)
+- "compensation" (For salary, bonuses, retention, escrow forfeitures, pay metrics, statutory deductions, and liquidated damages/penalties related to financial forfeiture)
 - "intellectual_property" (For copyright, patents, moral waivers, work-for-hire)
-- "confidentiality" (For NDAs, trade secrets, data privacy)
+- "confidentiality" (For NDAs, trade secrets - NOT personal data privacy)
+- "privacy_data" (For clauses mentioning DPDP Act, personal device monitoring, biometric data, or waiving personal data privacy rights)
 - "force_majeure" (For acts of god, pandemics, strikes, suspended obligations)
 - "indemnification" (For hold harmless, defense, liability shifts)
-- "termination" (For termination for convenience, cause, notice periods)
+- "liability_limit" (For clauses capping liability or excluding indirect damages)
+- "termination" (For termination for convenience, cause, notice periods, and Garden Leave provisions)
+- "amendment" (For clauses dealing with modifications, unilateral changes, or retroactive policies)
+- "auto_renewal" (For evergreen renewals or automatic term extensions)
 
 If a clause fits multiple, select the dominant operational mechanism. Do NOT output codes or alternate categories like 'arbitration' or 'payment'. Only the exact string tokens above are valid.
 

@@ -1,0 +1,242 @@
+[
+  {
+    "id": "TC_001_NON_COMPETE_PREDATORY",
+    "text": "Upon separation from the Company for any reason, the Employee is strictly barred from working for, consulting with, or advising any logistics or technology firm globally for an absolute and indefinite duration.",
+    "expected_type": "non_compete",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 of the Indian Contract Act, 1872 - Absolute post-employment restraint of trade."
+  },
+  {
+    "id": "TC_002_NON_COMPETE_SAFE_HARBOR",
+    "text": "During the active term of employment, the Employee shall devote their entire working time and attention exclusively to the business of the Company and shall not engage in any competing commercial activities.",
+    "expected_type": "non_compete",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Niranjan Shankar Golikari Precedent - Active term exclusivity covenants are fully valid."
+  },
+  {
+    "id": "TC_003_ARBITRATION_UNILATERAL",
+    "text": "All disputes arising out of this agreement shall be settled via binding arbitration. The Company reserves the exclusive, unilateral right to nominate, select, and finalize the Sole Arbitrator.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Section 12(5) read with Seventh Schedule of Arbitration Act - Unilateral appointment bias."
+  },
+  {
+    "id": "TC_004_WAGE_DEDUCTION_PUNITIVE",
+    "text": "The Company shall withhold 25% of the Employee's gross monthly compensation as a performance contingency reserve. This accumulated balance shall be permanently forfeited if the Employee leaves before 36 months.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act and Payment of Wages Act - Unenforceable penalty and illegal retention."
+  },
+  {
+    "id": "TC_005_COPYRIGHT_WAIVER_TRAP",
+    "text": "The Employee hereby waives all statutory reversionary rights under Section 19(4) of the Copyright Act. Even if the Company fails to exploit the software for over one year, ownership shall not revert to the Employee.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Section 19(4) of the Copyright Act, 1957 - Predatory statutory contracting-out."
+  },
+  {
+    "id": "TC_006_FORCE_MAJEURE_UNILATERAL",
+    "text": "In the event of a pandemic, strike, or act of God, the Company's obligations to pay fees shall be suspended. However, the Contractor's obligation to deliver services remains absolute and unmodified.",
+    "expected_type": "force_majeure",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Lack of Mutuality - One-sided suspension of obligations."
+  },
+  {
+    "id": "TC_007_IP_PRIOR_INVENTION_CAPTURE",
+    "text": "The Employee assigns to the Company all rights, title, and interest in any intellectual property conceived, developed, or reduced to practice prior to the commencement of employment, unless specifically listed in Exhibit A (which is left blank).",
+    "expected_type": "intellectual_property",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Overbroad IP Capture - Attempting to seize pre-existing personal property without separate consideration."
+  },
+  {
+    "id": "TC_008_INDEMNIFICATION_BROAD",
+    "text": "The Vendor agrees to indemnify, defend, and hold harmless the Company against any and all claims, including those arising entirely from the Company's own gross negligence or willful misconduct.",
+    "expected_type": "indemnification",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Unconscionable Indemnification - Mandating coverage for the indemnitee's own gross negligence."
+  },
+  {
+    "id": "TC_009_TERMINATION_FOR_CONVENIENCE",
+    "text": "The Company may terminate this Agreement at any time, for any reason or no reason, upon 24 hours' notice. The Contractor shall not be entitled to payment for any work completed prior to termination that has not yet been invoiced.",
+    "expected_type": "termination",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Forfeiture of Earned Wages/Fees - Termination for convenience without payment for rendered services."
+  },
+  {
+    "id": "TC_010_TRAINING_BOND_PENALTY",
+    "text": "The Employee acknowledges that the Company will incur substantial costs for training. If the Employee resigns within 24 months, they agree to pay a fixed penalty of INR 5,00,000 as liquidated damages, regardless of the actual training cost.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act - Unenforceable penalty in terrorem instead of genuine pre-estimate of loss."
+  },
+  {
+    "id": "TC_011_NON_SOLICIT_BROAD",
+    "text": "For a period of 5 years following termination, the Employee shall not directly or indirectly solicit, accept business from, or deal with any client, customer, or prospect of the Company anywhere in the world.",
+    "expected_type": "non_solicitation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 of the Contract Act - Broad non-solicit functioning as an illegal restraint of trade."
+  },
+  {
+    "id": "TC_012_UNILATERAL_VARIATION",
+    "text": "The Company reserves the absolute right to unilaterally modify, reduce, or alter the Employee's salary, benefits, or work location at any time, with or without notice.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Payment of Wages Act / Contract Act - Unilateral retrospective modification of core consideration."
+  },
+  {
+    "id": "TC_013_FOREIGN_JURISDICTION",
+    "text": "This Agreement shall be governed by the laws of the State of Delaware, USA. The Employee consents to the exclusive jurisdiction of the courts located in Wilmington, Delaware for all disputes.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Oppressive Jurisdiction - Forcing a local employee into an unaffordable foreign jurisdiction."
+  },
+  {
+    "id": "TC_014_INDEFINITE_PROBATION",
+    "text": "The Employee shall be on probation for an initial period of 6 months. The Company may extend this probation period indefinitely at its sole discretion, during which time the Employee may be terminated without notice or cause.",
+    "expected_type": "termination",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Industrial Disputes Act - Indefinite probation undermining statutory retrenchment rights."
+  },
+  {
+    "id": "TC_015_MANDATORY_ARBITRATION_CRIMINAL",
+    "text": "Any and all disputes, claims, or controversies arising out of the employment, including but not limited to claims of sexual harassment, discrimination, or statutory violations, shall be subject exclusively to private, confidential binding arbitration.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "POSH Act / Public Policy - Attempting to force criminal or statutory harassment claims into private arbitration."
+  },
+  {
+    "id": "TC_016_EXCLUSIVITY_SAFE_HARBOR",
+    "text": "During regular working hours, the Employee agrees to devote their full attention to the Company. The Employee may engage in outside freelancing during weekends provided it does not involve any direct competitors.",
+    "expected_type": "other",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Valid active-term exclusivity with safe harbor for non-competing moonlighting."
+  },
+  {
+    "id": "TC_017_TRAINING_BOND_SAFE_HARBOR",
+    "text": "If the Company sponsors an external certification for the Employee, and the Employee resigns within 12 months, the Employee agrees to reimburse the exact, pro-rated actual cost of the certification course as evidenced by invoices.",
+    "expected_type": "compensation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Valid indemnification for actual, proven, pro-rated training costs."
+  },
+  {
+    "id": "TC_018_IP_WORK_FOR_HIRE_SAFE_HARBOR",
+    "text": "All intellectual property created by the Employee during their normal working hours, using Company equipment, or strictly related to the Company's active business, shall be the sole property of the Company.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Standard compliant work-for-hire doctrine limited to employment scope."
+  },
+  {
+    "id": "TC_019_MUTUAL_INDEMNIFICATION_SAFE_HARBOR",
+    "text": "Each party agrees to indemnify and hold harmless the other party against direct damages arising out of the indemnifying party's gross negligence or willful misconduct in the performance of this agreement.",
+    "expected_type": "indemnification",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Mutual, fault-based indemnification avoiding unconscionable risk transfer."
+  },
+  {
+    "id": "TC_020_UNPAID_SUSPENSION",
+    "text": "The Company may place the Employee on an unpaid disciplinary suspension for an indefinite duration pending any internal investigation, during which time the Employee may not seek alternative employment.",
+    "expected_type": "other",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Payment of Wages Act / Contract Act - Deprivation of livelihood and illegal restraint."
+  },
+  {
+    "id": "TC_021_DATA_PRIVACY_VIOLATION",
+    "text": "The Employee grants the Company the absolute right to monitor, record, and store all personal communications, financial data, and biometric information captured on their personal devices, even outside working hours, and completely waives all rights under the Digital Personal Data Protection Act, 2023.",
+    "expected_type": "privacy_data",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "DPDP Act 2023 - Unconscionable surveillance and illegal waiver of statutory privacy rights."
+  },
+  {
+    "id": "TC_022_LIQUIDATED_DAMAGES_EXCESSIVE",
+    "text": "In the event of a breach of any trivial company policy, the Employee shall be liable to pay the Company an immediate penalty of INR 50,00,000, irrespective of the actual damages or financial loss suffered by the Company.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act - Penalty in terrorem, not a genuine pre-estimate of loss."
+  },
+  {
+    "id": "TC_023_WAGE_DEDUCTION_SAFE_HARBOR",
+    "text": "The Company may deduct applicable income taxes at source (TDS) and statutory provident fund (EPF) contributions from the Employee's monthly salary as mandated by applicable Indian tax and labor laws.",
+    "expected_type": "compensation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Payment of Wages Act - Statutory deductions are perfectly legal."
+  },
+  {
+    "id": "TC_024_NON_COMPETE_GARDEN_LEAVE",
+    "text": "The Company may, at its discretion, place the Employee on 'Garden Leave' during the 3-month notice period. During this period, the Employee shall receive their full salary and benefits but must remain exclusively employed by the Company and may not join a competitor.",
+    "expected_type": "termination",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Garden leave with full pay during the notice period is an active employment term and not an illegal restraint of trade under Section 27."
+  },
+  {
+    "id": "TC_025_ARBITRATION_BIASED_SEAT",
+    "text": "Any dispute shall be exclusively resolved through binding arbitration. The arbitral tribunal shall consist of three members, all of whom shall be current senior executives or directors of the Company.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Arbitration Act - Violation of impartiality and independence of arbitrators (Seventh Schedule)."
+  },
+  {
+    "id": "TC_026_IP_MORAL_RIGHTS_WAIVER",
+    "text": "The Employee hereby absolutely and irrevocably waives any and all moral rights under Section 57 of the Copyright Act, 1957, in perpetuity, and agrees never to claim authorship or object to any derogatory modification of their work.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 57 of the Copyright Act, 1957 - Moral rights (paternity and integrity) are generally considered inalienable and cannot be fully waived."
+  },
+  {
+    "id": "TC_027_MUTUAL_NON_DISPARAGEMENT",
+    "text": "Both the Company and the Employee mutually agree that during and after the term of employment, neither party shall make any public, derogatory, or disparaging statements regarding the other party on any platform.",
+    "expected_type": "confidentiality",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Standard, mutual, bilateral non-disparagement is perfectly legal and low risk."
+  },
+  {
+    "id": "TC_028_AUTO_RENEWAL_EVERGREEN",
+    "text": "This Agreement shall automatically renew for successive 5-year terms unless the Vendor provides written notice of termination exactly 365 days prior to the expiration date. Failure to do so will result in an irrevocable renewal.",
+    "expected_type": "auto_renewal",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Predatory evergreen auto-renewal with unconscionable notice windows designed to trap the vendor."
+  },
+  {
+    "id": "TC_029_NON_SOLICIT_EMPLOYEES_ONLY",
+    "text": "For a period of 12 months following termination, the Employee agrees not to actively poach, solicit, or entice away any current employees of the Company to join a competing enterprise.",
+    "expected_type": "non_solicitation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Non-solicitation of employees (anti-poaching) is generally upheld in India, unlike non-solicitation of clients/customers which is struck down under Section 27."
+  },
+  {
+    "id": "TC_030_RETROACTIVE_POLICY_BINDING",
+    "text": "The Company reserves the absolute right to amend its internal policies, including compensation structures and performance metrics, at any time. The Employee agrees to be automatically bound by any such policies retroactively from the date of their initial employment.",
+    "expected_type": "amendment",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Retroactive unilateral amendments to core consideration without mutual consent are legally dubious under the Contract Act."
+  }
+]
