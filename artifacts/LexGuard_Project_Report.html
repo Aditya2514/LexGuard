@@ -328,6 +328,10 @@
     border-top: 1px solid var(--border);
   }
 </style>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', fontFamily: 'Inter' });
+</script>
 </head>
 <body>
 
@@ -416,7 +420,54 @@
   <p>LexGuard follows a modular, multi-agent architecture with graceful degradation at every layer. The system is designed so that no single point of failure can bring down the entire pipeline.</p>
 
   <div class="diagram-container">
-    <img src="system_architecture.png" alt="LexGuard System Architecture">
+    <div class="mermaid">
+graph TB
+    subgraph "Frontend (React + Vite)"
+        LP["Landing Page"]
+        Login["Login / Register"]
+        Dashboard["Dashboard"]
+        Detail["Contract Detail"]
+        Chat["Contract Chat"]
+        Pricing["Pricing Page"]
+    end
+
+    subgraph "Backend (Express.js)"
+        API["REST API Layer"]
+        Auth["JWT Auth Middleware"]
+        Upload["Multer File Upload"]
+        Parser["Parser Service"]
+        Splitter["Clause Splitter"]
+        Queue["Job Queue Service"]
+    end
+
+    subgraph "6-Agent AI Pipeline"
+        A0["Agent 0: PreFlight"]
+        A1["Agent 1: Clause Extractor"]
+        A2["Agent 2: Risk Analyst"]
+        A25["Agent 2.5: Adversarial Judge"]
+        V6["V6 Deterministic Traps"]
+        A3["Agent 3: User Advocate"]
+        A4["Agent 4: Compliance Checker"]
+        A5["Agent 5: Contract Chat"]
+    end
+
+    subgraph "Data Layer"
+        Mongo["MongoDB Atlas"]
+        Redis["Redis (Optional)"]
+        HF["HuggingFace API"]
+        LLM["LLM Provider"]
+    end
+
+    LP --> Login --> Dashboard --> Detail --> Chat
+    Dashboard --> Upload --> Parser --> Splitter --> Queue
+    Queue --> A0 --> A1 --> A2 --> A25 --> V6 --> A3 --> A4
+    Detail --> A5
+    A2 --> HF
+    A1 --> LLM
+    Queue --> Mongo
+    Queue --> Redis
+    Pricing --> API
+    </div>
     <p class="diagram-caption">Figure 1: LexGuard System Architecture — Frontend, Backend, AI Pipeline, and Data Layer</p>
   </div>
 
@@ -540,7 +591,21 @@
   <p>The heart of LexGuard is a sequential multi-agent pipeline orchestrated by <code>jobQueueService.js</code>. When a contract is uploaded, the following agents execute in strict order:</p>
 
   <div class="diagram-container">
-    <img src="agent_pipeline.png" alt="LexGuard 6-Agent Pipeline">
+    <div class="mermaid">
+graph LR
+    Upload["📄 Upload"] --> Parse["🔧 Parse & Split"]
+    Parse --> A0["🧠 Agent 0\nPreFlight"]
+    A0 --> A1["📋 Agent 1\nClassifier"]
+    A1 --> A2["⚠️ Agent 2\nRisk Analyst"]
+    A2 --> A25["⚖️ Agent 2.5\nAdversarial Judge"]
+    A25 --> V6["🛡️ V6 Traps\n18 Patterns"]
+    V6 --> A3["💬 Agent 3\nUser Advocate"]
+    V6 --> A4["📜 Agent 4\nCompliance"]
+    V6 --> EMB["🔢 Embeddings"]
+    A3 --> Done["✅ Complete"]
+    A4 --> Done
+    EMB --> Done
+    </div>
     <p class="diagram-caption">Figure 2: The 6-Agent AI Pipeline — From Upload to Complete Analysis</p>
   </div>
 
@@ -588,7 +653,13 @@
   <p>The mathematically secure guardrail that runs AFTER the LLM and Judge. It uses pure keyword pattern matching (no AI) to catch predatory traps that LLMs consistently under-rate.</p>
 
   <div class="diagram-container">
-    <img src="dual_layer_defense.png" alt="Dual-Layer Defense Architecture">
+    <div class="mermaid">
+graph TD
+    LLM["LLM Agent 2 Risk Analysis"] --> Judge["Agent 2.5 Adversarial Judge"]
+    Judge --> SafetyNet{"V6 Deterministic Safety Net\n(18 Hardcoded Traps)"}
+    SafetyNet -->|Match Found| Override["CRITICAL Override"]
+    SafetyNet -->|No Match| Keep["Keep LLM Risk Level"]
+    </div>
     <p class="diagram-caption">Figure 3: Dual-Layer Defense Architecture — LLM Semantic Analysis + Deterministic Safety Net</p>
   </div>
 
@@ -762,7 +833,31 @@
   <h2 class="page-break">14. User Flow: End-to-End Journey</h2>
 
   <div class="diagram-container">
-    <img src="user_journey.png" alt="LexGuard User Journey">
+    <div class="mermaid">
+journey
+    title LexGuard User Journey
+    section Onboarding
+      Visit Landing Page: 5: User
+      Register Account: 4: User
+      Login: 4: User
+    section Contract Analysis
+      Upload Contract PDF: 5: User
+      Select Contract Category: 4: User
+      Wait for AI Analysis: 3: User, System
+      View Dashboard: 5: User
+    section Review Results
+      Browse Clause Table: 5: User
+      Read Risk Explanations: 5: User
+      Review Negotiation Tips: 5: User
+      Check Suggested Rewrites: 5: User
+    section Interactive
+      Ask Questions via Chat: 5: User
+      Delete Old Contracts: 3: User
+    section Upgrade
+      Visit Pricing Page: 4: User
+      Pay via Razorpay: 4: User
+      Unlock Pro Quota: 5: User
+    </div>
     <p class="diagram-caption">Figure 4: End-to-End User Journey — From Signup to Contract Analysis</p>
   </div>
 
