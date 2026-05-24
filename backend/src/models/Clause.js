@@ -78,6 +78,10 @@ const clauseSchema = new mongoose.Schema(
     potential_issue_areas: { type: [String], default: [] },
     human_review_strongly_recommended: { type: Boolean, default: null },
     explanatory_note: { type: String, default: null },
+
+    // ── Phase 5: Agent 6 – Adversary (Red-Teaming) ───────────────────────
+    adversarial_warning: { type: String, default: null },
+    hardened_rewrite: { type: String, default: null },
   },
   { timestamps: true }
 );

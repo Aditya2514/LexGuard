@@ -21,6 +21,12 @@ const contractSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    parentContractId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Contract',
+      default: null,
+      index: true,
+    },
     originalFileName: {
       type: String,
       required: [true, 'Original file name is required'],

@@ -9,6 +9,8 @@ const { classifyClausesForContract } = require('./agent1ClauseExtractor');
 const { analyseRisksForContract } = require('./agent2RiskAnalyst');
 const { generateUserAdvocateForContract } = require('./agent3UserAdvocate');
 const { runComplianceCheckForContract } = require('./agent4ComplianceChecker');
+const { runAdversaryRedTeamForContract } = require('./agent6Adversary');
+const { dispatchWebhooks } = require('./webhookDispatcher');
 
 const QUEUE_NAME = 'lexguard:queue';
 let workerActive = false;
@@ -90,12 +92,24 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 100, 'Analysis complete', 'completed');
     console.log(`🎉 [Queue Worker] Successfully processed contract: ${contractId}`);
 
+    // Asynchronously launch Agent 6 (Adversary Red-Teaming) in the background.
+    // This does not block the UI or the job queue completion status.
+    runAdversaryRedTeamForContract(contractId).catch(err => {
+        console.error(`⚠️ [Agent 6] Background Red-Teaming failed: ${err.message}`);
+    });
+
+    // Fire webhook to notify enterprise integrations
+    await dispatchWebhooks('contract.analyzed', contractId);
+
   } catch (err) {
     console.error(`❌ [Queue Worker] Fatal error processing contract ${contractId}:`, err.message);
     
     // Set Job and Contract to failed states
     await updateJobProgress(contractId, 100, 'Analysis failed', 'failed', err.message);
     await Contract.findByIdAndUpdate(contractId, { status: 'failed' });
+
+    // Fire failure webhook
+    await dispatchWebhooks('contract.failed', contractId, { error: err.message });
   }
 }
 
