@@ -4,7 +4,7 @@ const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
 const { RISK_LEVELS, AGENT_BATCH_SIZE } = require('../config/constants');
 const { LAW_REFERENCES } = require('../config/lawReferences');
-const { retrieveRelevantLaws } = require('./lawRetrieverService');
+const { retrieveComplianceContext } = require('./lawRetrieverService');
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
@@ -497,7 +497,7 @@ function computeOverallRisk(clauseRiskLevels) {
  * @param {string} contractId
  */
 async function analyseRisksForContract(contractId) {
-  const contract = await Contract.findById(contractId).select('globalContext');
+  const contract = await Contract.findById(contractId).select('globalContext contractCategory');
   const clauses = await Clause.find({
     contractId,
     risk_level: null,
@@ -507,7 +507,7 @@ async function analyseRisksForContract(contractId) {
     // Build batch items by fetching dynamic laws in parallel for each item (Intra-agent concurrency)
     const items = await Promise.all(
       clauses.map(async (c) => {
-        const retrieved = await retrieveRelevantLaws(c.rawText, c.clause_type || 'other');
+        const retrieved = await retrieveComplianceContext(contract.contractCategory, c.clause_type || 'other', c.rawText);
         return {
           id: c._id.toString(),
           text: c.rawText,
