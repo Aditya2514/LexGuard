@@ -372,12 +372,12 @@ function detectPredatoryTraps(text) {
         detectedTraps.push({ type: 'wage forfeiture on termination', severity: 'critical' });
     }
 
-    // ── Pattern 22: Ghost Jurisdiction / Offshore Law ──────────────────────────────
-    const hasForeignLaw = lower.includes("cayman islands") || lower.includes("delaware") || lower.includes("laws of england") || lower.includes("singapore") || lower.includes("new york");
+    // ── Pattern 22: Hostile/Ghost Jurisdiction ──────────────────────────────
+    const hasForeignLaw = lower.includes("cayman islands") || lower.includes("delaware") || lower.includes("laws of england") || lower.includes("singapore") || lower.includes("new york") || lower.includes("port blair") || lower.includes("andaman");
     const hasExclusiveJurisdiction = lower.includes("exclusively governed by") || lower.includes("exclusive jurisdiction") || lower.includes("solely governed by");
 
     if (hasForeignLaw && hasExclusiveJurisdiction) {
-        detectedTraps.push({ type: 'hostile foreign jurisdiction', severity: 'critical' });
+        detectedTraps.push({ type: 'hostile jurisdiction', severity: 'critical' });
     }
 
     // ── Pattern 23: Ghost Equity Clawback ─────────────────────────────────────────
