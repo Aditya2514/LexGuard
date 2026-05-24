@@ -31,7 +31,7 @@ async function processPdfFile(filePath, actName, domain) {
   const formattedSections = sectionChunks.map((chunk, index) => {
     // Attempt to extract the section number
     const match = chunk.match(/(?:Section\s+|^\s*)(\d+[A-Z]*)/i);
-    const sectionNum = match ? `Section ${match[1]}` : `Part ${index + 1}`;
+    const sectionNum = match ? `Section ${match[1]} (Chunk ${index + 1})` : `Part ${index + 1}`;
     
     // Clean up text
     const content = chunk.replace(/\s+/g, ' ').trim();

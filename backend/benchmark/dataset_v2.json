@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC_021_DATA_PRIVACY_VIOLATION",
+    "text": "The Employee grants the Company the absolute right to monitor, record, and store all personal communications, financial data, and biometric information captured on their personal devices, even outside working hours, and completely waives all rights under the Digital Personal Data Protection Act, 2023.",
+    "expected_type": "privacy_data",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "DPDP Act 2023 - Unconscionable surveillance and illegal waiver of statutory privacy rights."
+  },
+  {
+    "id": "TC_022_LIQUIDATED_DAMAGES_EXCESSIVE",
+    "text": "In the event of a breach of any trivial company policy, the Employee shall be liable to pay the Company an immediate penalty of INR 50,00,000, irrespective of the actual damages or financial loss suffered by the Company.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 of the Contract Act - Penalty in terrorem, not a genuine pre-estimate of loss."
+  },
+  {
+    "id": "TC_023_WAGE_DEDUCTION_SAFE_HARBOR",
+    "text": "The Company may deduct applicable income taxes at source (TDS) and statutory provident fund (EPF) contributions from the Employee's monthly salary as mandated by applicable Indian tax and labor laws.",
+    "expected_type": "compensation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Payment of Wages Act - Statutory deductions are perfectly legal."
+  },
+  {
+    "id": "TC_024_NON_COMPETE_GARDEN_LEAVE",
+    "text": "The Company may, at its discretion, place the Employee on 'Garden Leave' during the 3-month notice period. During this period, the Employee shall receive their full salary and benefits but must remain exclusively employed by the Company and may not join a competitor.",
+    "expected_type": "termination",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Garden leave with full pay during the notice period is an active employment term and not an illegal restraint of trade under Section 27."
+  },
+  {
+    "id": "TC_025_ARBITRATION_BIASED_SEAT",
+    "text": "Any dispute shall be exclusively resolved through binding arbitration. The arbitral tribunal shall consist of three members, all of whom shall be current senior executives or directors of the Company.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "HIGH",
+    "expected_violation": true,
+    "legal_hook": "Arbitration Act - Violation of impartiality and independence of arbitrators (Seventh Schedule)."
+  }
+]

@@ -59,7 +59,7 @@ You must reply with valid JSON only, with this structure:
   - For low: 1–2 concrete, light suggestions or "no major changes needed, but you can ask for X if concerned".
   - For medium: 2–3 concrete changes you can ask for.
   - For high/critical: 3–5 concrete, specific negotiation asks (e.g., shorten duration, narrow geography, cap amounts, require mutual obligations, neutral arbitrator, etc.).
-- suggested_rewrite: For high/critical risk clauses, you MUST provide a full, cleanly written paragraph showing exactly how the clause should be rewritten to be fair, mutual, and legally compliant. If risk is low/medium, set to null.
+- suggested_rewrite: For high/critical risk clauses, you MUST provide a full, cleanly written paragraph showing exactly how the clause should be rewritten to be fair, mutual, and legally compliant under Indian law. You MUST completely strip out the predatory element while retaining reasonable operational protection for the business context. Match the original tone and formatting of the contract. Do NOT use placeholders. If risk is low/medium, set to null.
 
 ### 4. Special handling rules
 - High/critical clauses ("danger" clauses):

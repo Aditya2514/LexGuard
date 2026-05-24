@@ -275,6 +275,77 @@ function detectPredatoryTraps(text) {
     if (hasProbation && hasIndefiniteExtension && hasTerminationWithoutCause) {
         detectedTraps.push({ type: 'indefinite probation trap', severity: 'high' });
     }
+    // ── Pattern 14: Unconscionable Surveillance / Privacy Waiver ─────────
+    const hasSurveillanceVerb = (
+        lower.includes('monitor, record, and store') || 
+        lower.includes('surveillance') || 
+        lower.includes('track')
+    );
+    const hasPrivacyTarget = (
+        lower.includes('personal devices') || 
+        lower.includes('biometric') || 
+        lower.includes('fingerprint') || 
+        lower.includes('facial recognition') || 
+        lower.includes('digital personal data protection') || 
+        lower.includes('dpdp')
+    );
+    const hasWaiver = (
+        lower.includes('waives all rights') || 
+        lower.includes('absolute right to monitor') || 
+        lower.includes('completely waives')
+    );
+    if (hasSurveillanceVerb && hasPrivacyTarget && hasWaiver) {
+        detectedTraps.push({ type: 'unconscionable surveillance', severity: 'critical' });
+    }
+
+    // ── Pattern 15: Broad Liquidated Damages / Penalty in Terrorem ───────
+    const hasPenaltyKeyword = (
+        lower.includes('penalty') || 
+        lower.includes('liquidated damages')
+    );
+    const hasDisregardForActualDamage = (
+        lower.includes('irrespective of the actual damages') || 
+        lower.includes('regardless of actual loss') || 
+        lower.includes('irrespective of actual loss')
+    );
+    const hasTrivialTrigger = (
+        lower.includes('trivial') || 
+        lower.includes('any breach') || 
+        lower.includes('minor breach')
+    );
+    if (hasPenaltyKeyword && hasDisregardForActualDamage && hasTrivialTrigger) {
+        detectedTraps.push({ type: 'excessive liquidated damages penalty', severity: 'critical' });
+    }
+    // ── Pattern 16: Moral Rights Waiver (Copyright Act, Sec 57 Violation) ─────────
+    const moralRightsKeywords = [
+        "waive all moral rights", 
+        "waive moral rights", 
+        "waives any and all moral rights",
+        "derogatory modification", 
+        "section 57", 
+        "relinquish moral rights"
+    ];
+    const matchesPattern16 = moralRightsKeywords.some(keyword => lower.includes(keyword));
+
+    if (matchesPattern16) {
+        detectedTraps.push({ type: 'moral rights waiver', severity: 'critical' });
+    }
+
+    // ── Pattern 17: Evergreen Auto-Renewal Trap (Unconscionable Notice Windows) ───
+    const hasAutoRenew = lower.includes("automatically renew") || lower.includes("auto-renew");
+    const hasPredatoryNotice = lower.includes("365 days") || lower.includes("12 months in advance") || lower.includes("successive periods of 5 years") || lower.includes("successive 5-year terms");
+    
+    if (hasAutoRenew && hasPredatoryNotice) {
+        detectedTraps.push({ type: 'predatory evergreen auto-renewal', severity: 'critical' });
+    }
+
+    // ── Pattern 18: Retroactive Policy/Compensation Amendments ────────────────────
+    const hasAmendment = lower.includes("amend") || lower.includes("modify") || lower.includes("alter") || lower.includes("bound by");
+    const hasRetroactive = lower.includes("retroactively");
+
+    if (hasAmendment && hasRetroactive) {
+        detectedTraps.push({ type: 'retroactive amendment', severity: 'critical' });
+    }
     
     return detectedTraps;
 }

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "TC_026_IP_MORAL_RIGHTS_WAIVER",
+    "text": "The Employee hereby absolutely and irrevocably waives any and all moral rights under Section 57 of the Copyright Act, 1957, in perpetuity, and agrees never to claim authorship or object to any derogatory modification of their work.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 57 of the Copyright Act, 1957 - Moral rights (paternity and integrity) are generally considered inalienable and cannot be fully waived."
+  },
+  {
+    "id": "TC_027_MUTUAL_NON_DISPARAGEMENT",
+    "text": "Both the Company and the Employee mutually agree that during and after the term of employment, neither party shall make any public, derogatory, or disparaging statements regarding the other party on any platform.",
+    "expected_type": "confidentiality",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Standard, mutual, bilateral non-disparagement is perfectly legal and low risk."
+  },
+  {
+    "id": "TC_028_AUTO_RENEWAL_EVERGREEN",
+    "text": "This Agreement shall automatically renew for successive 5-year terms unless the Vendor provides written notice of termination exactly 365 days prior to the expiration date. Failure to do so will result in an irrevocable renewal.",
+    "expected_type": "auto_renewal",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Predatory evergreen auto-renewal with unconscionable notice windows designed to trap the vendor."
+  },
+  {
+    "id": "TC_029_NON_SOLICIT_EMPLOYEES_ONLY",
+    "text": "For a period of 12 months following termination, the Employee agrees not to actively poach, solicit, or entice away any current employees of the Company to join a competing enterprise.",
+    "expected_type": "non_solicitation",
+    "expected_risk": "LOW",
+    "expected_violation": false,
+    "legal_hook": "Non-solicitation of employees (anti-poaching) is generally upheld in India, unlike non-solicitation of clients/customers which is struck down under Section 27."
+  },
+  {
+    "id": "TC_030_RETROACTIVE_POLICY_BINDING",
+    "text": "The Company reserves the absolute right to amend its internal policies, including compensation structures and performance metrics, at any time. The Employee agrees to be automatically bound by any such policies retroactively from the date of their initial employment.",
+    "expected_type": "amendment",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Retroactive unilateral amendments to core consideration without mutual consent are legally dubious under the Contract Act."
+  }
+]
