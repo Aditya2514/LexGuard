@@ -226,7 +226,7 @@ router.get(
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    res.write(\`data: \${JSON.stringify({ status: contract.status, message: 'Connected' })}\\n\\n\`);
+    res.write(`data: ${JSON.stringify({ status: contract.status, message: 'Connected' })}\n\n`);
 
     const intervalId = setInterval(async () => {
       const updatedContract = await Contract.findById(req.params.id);
@@ -245,7 +245,7 @@ router.get(
         step: queueJob ? queueJob.step : '',
       };
 
-      res.write(\`data: \${JSON.stringify(payload)}\\n\\n\`);
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
 
       if (updatedContract.status === 'done' || updatedContract.status === 'failed') {
         clearInterval(intervalId);
