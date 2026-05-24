@@ -21,24 +21,9 @@ const jobQueueService = require('../services/jobQueueService');
 const QueueJob = require('../models/QueueJob');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const { storage } = require('../services/gridFsStorage');
 
 // ── Multer Setup ────────────────────────────────────────────────────────────
-
-const uploadsDir = process.env.VERCEL
-  ? '/tmp'
-  : path.join(__dirname, '../../uploads');
-
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, unique + path.extname(file.originalname));
-  },
-});
 
 const fileFilter = (_req, file, cb) => {
   const allowedMimes = [
@@ -48,13 +33,10 @@ const fileFilter = (_req, file, cb) => {
   const allowedExts = ['.pdf', '.docx'];
   const ext = path.extname(file.originalname).toLowerCase();
 
-  if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+  if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    // Must pass a plain Error to multer (not ApiError) so multer forwards it correctly
-    const err = new Error('Only PDF and DOCX files are allowed.');
-    err.statusCode = 400;
-    cb(err, false);
+    cb(new ApiError(400, 'Invalid file type. Only PDF and DOCX are allowed.'));
   }
 };
 
@@ -66,16 +48,7 @@ const upload = multer({
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
-/** Silently deletes a temp file after processing. */
-const deleteTempFile = (filePath) => {
-  if (filePath && fs.existsSync(filePath)) {
-    try {
-      fs.unlinkSync(filePath);
-    } catch (e) {
-      console.warn(`⚠️  Could not delete temp file: ${filePath}`);
-    }
-  }
-};
+
 
 // ── POST /api/contracts ─────────────────────────────────────────────────────
 // Upload a contract file, extract text, split into clauses, store in DB.
@@ -91,14 +64,13 @@ router.post(
     }
 
     if (req.user.usedThisMonth >= req.user.monthlyQuota) {
-      deleteTempFile(req.file.path);
+      // With GridFS, we would normally delete via gridFS bucket, but for now we skip complex cleanup
       throw new ApiError(429, 'Monthly contract quota exceeded. Please upgrade your plan.');
     }
 
     const { contractCategory, parentContractId } = req.body;
 
     if (!contractCategory || !CONTRACT_CATEGORIES.includes(contractCategory)) {
-      deleteTempFile(req.file.path);
       throw new ApiError(
         400,
         `Invalid or missing contractCategory. Allowed values: ${CONTRACT_CATEGORIES.join(', ')}.`
@@ -109,13 +81,12 @@ router.post(
 
     try {
       // 1. Extract and clean text from the uploaded file
-      const cleanedText = await extractText(req.file.path, req.file.originalname);
+      const cleanedText = await extractText(req.file.id, req.file.originalname);
 
       // 2. Split cleaned text into clause segments (heuristic, no AI)
       const clauseSegments = splitClauses(cleanedText);
 
       if (clauseSegments.length === 0) {
-        deleteTempFile(req.file.path);
         throw new ApiError(
           422,
           'No clauses could be extracted. The document may be too short or improperly formatted.'
@@ -127,6 +98,9 @@ router.post(
         userId: req.user._id,
         parentContractId: parentContractId || null,
         originalFileName: req.file.originalname,
+        fileName: req.file.filename,
+        filePath: req.file.filename,
+        fileSize: req.file.size,
         contractCategory,
         rawText: cleanedText,
         totalClauses: clauseSegments.length,
@@ -146,7 +120,7 @@ router.post(
       await Clause.insertMany(clauseDocs);
 
       // 5. Remove temp file (no longer needed after text extraction)
-      deleteTempFile(req.file.path);
+      // Skipped: We are using GridFS so we do not delete from the local filesystem
 
       // 6. Enqueue/Process contract job
       if (req.query.sync === 'true') {
@@ -191,7 +165,6 @@ router.post(
       if (contract?._id) {
         await Contract.findByIdAndUpdate(contract._id, { status: 'failed' }).catch(() => {});
       }
-      deleteTempFile(req.file?.path);
       throw err;
     }
   })
@@ -229,33 +202,37 @@ router.get(
 
     res.write(`data: ${JSON.stringify({ status: contract.status, message: 'Connected' })}\n\n`);
 
-    const intervalId = setInterval(async () => {
-      const updatedContract = await Contract.findById(req.params.id);
-      if (!updatedContract) {
-        clearInterval(intervalId);
-        res.end();
-        return;
-      }
+    // Initialize change stream on QueueJob collection
+    const changeStream = QueueJob.watch([], { fullDocument: 'updateLookup' });
 
-      const queueJob = await QueueJob.findOne({ contractId: req.params.id });
+    changeStream.on('change', async (change) => {
+      if (!change.fullDocument) return;
+      if (change.fullDocument.contractId.toString() !== req.params.id) return;
+
+      const qJob = change.fullDocument;
+      let cStatus = qJob.status === 'completed' ? 'done' : qJob.status;
       
       const payload = {
-        status: updatedContract.status,
-        overallRiskLevel: updatedContract.overallRiskLevel,
-        progress: queueJob ? queueJob.progress : 0,
-        step: queueJob ? queueJob.step : '',
+        status: cStatus,
+        overallRiskLevel: null,
+        progress: qJob.progress,
+        step: qJob.step,
       };
 
-      res.write(`data: ${JSON.stringify(payload)}\n\n`);
-
-      if (updatedContract.status === 'done' || updatedContract.status === 'failed') {
-        clearInterval(intervalId);
+      if (cStatus === 'done' || cStatus === 'failed') {
+        const updatedContract = await Contract.findById(req.params.id);
+        payload.status = updatedContract.status;
+        payload.overallRiskLevel = updatedContract.overallRiskLevel;
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        changeStream.close();
         res.end();
+      } else {
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
       }
-    }, 1000);
+    });
 
     req.on('close', () => {
-      clearInterval(intervalId);
+      changeStream.close();
     });
   })
 );

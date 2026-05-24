@@ -36,7 +36,7 @@ Your job is to highlight potential risks and pain points for a non-lawyer user, 
 
 ### 2. Input format
 
-You will receive a JSON object containing "clauses". Each clause may have a "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal content retrieved from our database.
+You will receive a JSON object containing "clauses". Each clause may have a "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal content retrieved from our database. It may also have a "retrieved_contract_context" array containing text from other sections of the same contract that are semantically related. Use this contract context to resolve defined terms or cross-references across the document.
 
 ### 3. Output format (JSON only)
 
@@ -567,15 +567,25 @@ async function analyseRisksForContract(contractId) {
   }).select('_id rawText clause_type');
 
   if (clauses.length > 0) {
+    const { searchSimilarClauses } = require('./embeddingService');
+
     // Build batch items by fetching dynamic laws in parallel for each item (Intra-agent concurrency)
     const items = await Promise.all(
       clauses.map(async (c) => {
         const retrieved = await retrieveComplianceContext(contract.contractCategory, c.clause_type || 'other', c.rawText);
+        
+        // Zero-Rupee Vector RAG: Fetch related clauses from the same document to maintain context
+        const similarClauses = await searchSimilarClauses(contractId, c.rawText, 3);
+        const retrieved_contract_context = similarClauses
+          .filter(sc => sc.clauseId.toString() !== c._id.toString())
+          .map(sc => `Clause ${sc.segmentIndex}: ${sc.rawText}`);
+
         return {
           id: c._id.toString(),
           text: c.rawText,
           clause_type: c.clause_type || 'other',
           retrieved_legal_context: retrieved,
+          retrieved_contract_context,
         };
       })
     );

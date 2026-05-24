@@ -47,26 +47,26 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 5, 'Initializing agents and extracting global context');
     await extractGlobalContextForContract(contractId);
 
-    // 2. Run Agent 1 (Clause Extraction/Classification)
-    await updateJobProgress(contractId, 20, 'Classifying contract clauses (Agent 1: Classifier)');
-    await classifyClausesForContract(contractId);
+    // 2. Run Agent 1 (Clause Extraction/Classification) and Embeddings (for RAG)
+    await updateJobProgress(contractId, 20, 'Classifying clauses and building RAG index');
+    const { embedClausesForContract } = require('./embeddingService');
+    await Promise.all([
+      classifyClausesForContract(contractId),
+      embedClausesForContract(contractId).catch(err => {
+        console.error(`⚠️  Non-fatal: Clause embedding failed, skipping RAG index creation: ${err.message}`);
+      })
+    ]);
 
     // 3. Run Agent 2 (Risk Analysis)
     await updateJobProgress(contractId, 45, 'Analyzing risks and statutory touchpoints (Agent 2: Risk Analyst)');
     await analyseRisksForContract(contractId);
 
-    // 4. Run Agent 3, Agent 4 & Embeddings Concurrently
-    await updateJobProgress(contractId, 70, 'Generating plain-language guides, checking Indian law, and building RAG index');
+    // 4. Run Agent 3 & Agent 4 Concurrently
+    await updateJobProgress(contractId, 70, 'Generating plain-language guides and checking Indian law');
     
-    // Lazy load embeddingService to avoid circular deps
-    const { embedClausesForContract } = require('./embeddingService');
-
     await Promise.all([
       generateUserAdvocateForContract(contractId),
-      runComplianceCheckForContract(contractId),
-      embedClausesForContract(contractId).catch(err => {
-        console.error(`⚠️  Non-fatal: Clause embedding failed, skipping RAG index creation: ${err.message}`);
-      })
+      runComplianceCheckForContract(contractId)
     ]);
 
     // 5. Finalize overall contract risk rating
@@ -154,16 +154,46 @@ async function runMongoWorkerPoll() {
   }
 
   try {
-    // Find the next queued job
-    const nextJob = await QueueJob.findOne({ status: 'queued' }).sort({ createdAt: 1 });
+    const LOCK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+    const workerId = process.pid.toString();
+
+    // Find the next queued job, or a job that has been locked for too long (crashed worker)
+    const nextJob = await QueueJob.findOneAndUpdate(
+      {
+        $or: [
+          { status: 'queued' },
+          { status: 'processing', lockedAt: { $lt: new Date(Date.now() - LOCK_TIMEOUT_MS) } }
+        ]
+      },
+      {
+        $set: {
+          status: 'processing',
+          step: 'Acquiring process lock',
+          lockedAt: new Date(),
+          lockedBy: workerId
+        },
+        $inc: { attempts: 1 }
+      },
+      { sort: { createdAt: 1 }, new: true }
+    );
+
     if (nextJob) {
-      console.log(`🤖 [Queue Worker] Polled contract job: ${nextJob.contractId} from MongoDB`);
-      // Optimistic lock: set state to processing
-      nextJob.status = 'processing';
-      nextJob.step = 'Acquiring process lock';
-      await nextJob.save();
+      console.log(`🤖 [Queue Worker ${workerId}] Polled/Locked contract job: ${nextJob.contractId} from MongoDB. Attempt: ${nextJob.attempts}`);
+      
+      // If a job fails more than 3 times, mark it as failed to prevent poison pills
+      if (nextJob.attempts > 3) {
+        console.error(`❌ [Queue Worker ${workerId}] Job ${nextJob.contractId} exceeded max attempts. Marking as failed.`);
+        await updateJobProgress(nextJob.contractId, 100, 'Analysis failed (Max attempts exceeded)', 'failed');
+        await Contract.findByIdAndUpdate(nextJob.contractId, { status: 'failed' });
+        return;
+      }
 
       await processContractJob(nextJob.contractId);
+      
+      // Unlock job upon successful or handled failure completion
+      await QueueJob.findByIdAndUpdate(nextJob._id, {
+        $set: { lockedAt: null, lockedBy: null }
+      });
     }
   } catch (err) {
     console.error('❌ [Queue Worker] MongoDB worker polling failed:', err.message);
