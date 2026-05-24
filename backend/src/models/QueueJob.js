@@ -28,6 +28,18 @@ const queueJobSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    lockedAt: {
+      type: Date,
+      default: null,
+    },
+    lockedBy: {
+      type: String, // e.g. worker ID or process ID
+      default: null,
+    },
+    attempts: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

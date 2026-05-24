@@ -1,4 +1,6 @@
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { parsePdf } = require('./pdfParser');
 const { parseDocx } = require('./docxParser');
 const { cleanText } = require('./textCleaner');
@@ -8,17 +10,17 @@ const {
   ocrFallbackForPdf,
 } = require('./ocrFallbackService');
 const ApiError = require('../utils/ApiError');
+const { getFileStream } = require('./gridFsStorage');
 
 const SUPPORTED_EXTENSIONS = ['.pdf', '.docx'];
 
 /**
  * Detects file type and delegates to the correct parser.
- * For scanned/image-based PDFs with low text density, automatically
- * falls back to Tesseract OCR if available on the system.
+ * Reads the file from GridFS, writes to an ephemeral tmp file, and extracts text.
  * Returns cleaned raw text as a single string.
  * Throws ApiError 422 for corrupted/unreadable files.
  */
-const extractText = async (filePath, originalName) => {
+const extractText = async (fileId, originalName) => {
   const ext = path.extname(originalName).toLowerCase();
 
   if (!SUPPORTED_EXTENSIONS.includes(ext)) {
@@ -29,13 +31,26 @@ const extractText = async (filePath, originalName) => {
   }
 
   let rawText;
+  
+  // Create a temporary file path
+  const tmpFilePath = path.join(os.tmpdir(), `lexguard-${Date.now()}-${originalName}`);
 
   try {
+    // Stream file from GridFS to local tmp storage for parsing
+    await new Promise((resolve, reject) => {
+      const readStream = getFileStream(fileId);
+      const writeStream = fs.createWriteStream(tmpFilePath);
+      readStream.pipe(writeStream);
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+      readStream.on('error', reject);
+    });
+
     if (ext === '.pdf') {
       try {
         const { parseWithLlama } = require('./llamaParseService');
         console.log('📄 Attempting LlamaParse extraction...');
-        rawText = await parseWithLlama(filePath);
+        rawText = await parseWithLlama(tmpFilePath);
         if (rawText && rawText.trim().length > 0) {
           console.log(`✅ LlamaParse extraction successful.`);
         } else {
@@ -43,15 +58,12 @@ const extractText = async (filePath, originalName) => {
         }
       } catch (llamaErr) {
         console.warn(`⚠️ LlamaParse failed or not configured (${llamaErr.message}). Falling back to pdf-parse...`);
-        rawText = await parsePdf(filePath);
+        rawText = await parsePdf(tmpFilePath);
       }
     } else if (ext === '.docx') {
-      rawText = await parseDocx(filePath);
+      rawText = await parseDocx(tmpFilePath);
     }
   } catch (parseErr) {
-    // pdf-parse throws errors like "bad XRef entry", "Invalid PDF structure"
-    // mammoth throws errors for corrupted/invalid ZIP (DOCX) files
-    // Both should be user-facing 422, not server 500
     throw new ApiError(
       422,
       `Could not parse the uploaded file. It may be corrupted, password-protected, or not a valid ${ext.toUpperCase()} file. (${parseErr.message})`
@@ -59,8 +71,6 @@ const extractText = async (filePath, originalName) => {
   }
 
   // ── OCR Fallback for Scanned PDFs ─────────────────────────────────────────
-  // If text extraction yielded very little content, the PDF is likely scanned.
-  // Attempt Tesseract OCR as a graceful fallback before rejecting the upload.
   if (ext === '.pdf' && (!rawText || rawText.trim().length < LOW_TEXT_DENSITY_THRESHOLD)) {
     console.log(`⚠️  Low text density detected (${(rawText || '').trim().length} chars). Checking for OCR fallback...`);
 
@@ -68,7 +78,7 @@ const extractText = async (filePath, originalName) => {
     if (tesseractReady) {
       try {
         console.log('📄 Scanned PDF detected. Initializing Tesseract OCR pipeline...');
-        rawText = await ocrFallbackForPdf(filePath);
+        rawText = await ocrFallbackForPdf(tmpFilePath);
         console.log(`✅ OCR extraction complete. Recovered ${rawText.trim().length} characters.`);
       } catch (ocrErr) {
         console.error(`❌ OCR fallback failed: ${ocrErr.message}`);
@@ -80,13 +90,17 @@ const extractText = async (filePath, originalName) => {
         );
       }
     } else {
-      // Tesseract not installed — give a clear, actionable message
       throw new ApiError(
         422,
         'Could not extract text from the uploaded PDF. The file appears to be scanned or image-based. ' +
           'OCR processing is not available on this server. Please upload a text-based PDF or DOCX file instead.'
       );
     }
+  }
+
+  // Cleanup temporary file to keep backend stateless
+  if (fs.existsSync(tmpFilePath)) {
+    fs.unlinkSync(tmpFilePath);
   }
 
   if (!rawText || rawText.trim().length === 0) {

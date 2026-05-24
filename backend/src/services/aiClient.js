@@ -6,6 +6,12 @@
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { AI_MODEL_NAME } = require('../config/constants');
+const pLimit = require('p-limit');
+// Some versions of p-limit export default
+const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+
+// Max 5 concurrent LLM calls globally across all agents to prevent HTTP 429
+const globalLlmLimiter = limitFn(5);
 
 // ── Singleton client ─────────────────────────────────────────────────────────
 
@@ -342,112 +348,109 @@ async function callLLM({
     }
   }
 
-  const primaryProvider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
+  // The actual network execution logic wrapped in our global concurrency limiter
+  return globalLlmLimiter(async () => {
+    const primaryProvider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
 
-  const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });
-  const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
-  const tryGrok = () => callGrok({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
-  const tryHuggingFace = () => callHuggingFace({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
-  const tryGemini = async () => {
-    const client = getClient();
-    let activeModel = AI_MODEL_NAME;
+    const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });
+    const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
+    const tryGrok = () => callGrok({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
+    const tryHuggingFace = () => callHuggingFace({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
+    const tryGemini = async () => {
+      const client = getClient();
+      let activeModel = AI_MODEL_NAME;
 
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const isThinkingModel = activeModel.includes('2.5');
-        const generationConfig = {
-          temperature,
-          maxOutputTokens: maxTokens,
-        };
-
-        if (jsonMode && !isThinkingModel) {
-          generationConfig.responseMimeType = 'application/json';
-        }
-
-        const modelConfig = {
-          model: activeModel,
-          systemInstruction: systemPrompt,
-          generationConfig,
-        };
-
-        if (isThinkingModel) {
-          modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
-        }
-
-        const model = client.getGenerativeModel(modelConfig);
-        const result = await model.generateContent(userContent);
-        const response = result.response;
-
-        let text = '';
+      for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          text = response.text();
-        } catch {}
+          const isThinkingModel = activeModel.includes('2.5');
+          const generationConfig = {
+            temperature,
+            maxOutputTokens: maxTokens,
+          };
 
-        if (!text && response.candidates && response.candidates[0]) {
-          const parts = response.candidates[0].content?.parts || [];
-          for (const part of parts) {
-            if (part.text) text = part.text;
+          if (jsonMode && !isThinkingModel) {
+            generationConfig.responseMimeType = 'application/json';
           }
-        }
 
-        if (!text) {
-          throw new Error('LLM returned an empty response — no text content found.');
-        }
+          const modelConfig = {
+            model: activeModel,
+            systemInstruction: systemPrompt,
+            generationConfig,
+          };
 
-        return extractJSON(text);
-      } catch (err) {
-        const isQuota = (err.message || '').toLowerCase().includes('quota');
-        if (attempt < 2 && isTransient(err)) {
-          if (isQuota && activeModel === 'gemini-2.5-flash') {
-            console.warn(`⚠️  Gemini 2.5 Flash quota exceeded. Automatically falling back to Gemini Flash Latest (Stable 1.5)...`);
-            activeModel = 'gemini-flash-latest';
+          if (isThinkingModel) {
+            modelConfig.generationConfig.thinkingConfig = { thinkingBudget: 0 };
+          }
+
+          const model = client.getGenerativeModel(modelConfig);
+          const result = await model.generateContent(userContent);
+          const response = result.response;
+
+          let text = '';
+          try {
+            text = response.text();
+          } catch {}
+
+          if (!text && response.candidates && response.candidates[0]) {
+            const parts = response.candidates[0].content?.parts || [];
+            for (const part of parts) {
+              if (part.text) text = part.text;
+            }
+          }
+
+          if (!text) {
+            throw new Error('LLM returned an empty response — no text content found.');
+          }
+
+          return extractJSON(text);
+        } catch (err) {
+          const isQuota = (err.message || '').toLowerCase().includes('quota');
+          if (attempt < 2 && isTransient(err)) {
+            if (isQuota && activeModel === 'gemini-2.5-flash') {
+              console.warn(`⚠️  Gemini 2.5 Flash quota exceeded. Automatically falling back to Gemini Flash Latest (Stable 1.5)...`);
+              activeModel = 'gemini-flash-latest';
+              continue;
+            }
+
+            const delayMs = getRetryDelayMs(err);
+            console.warn(`⚠️  Gemini transient error (attempt ${attempt + 1}/3), retrying in ${delayMs / 1000} s… (${err.message})`);
+            await sleep(delayMs);
             continue;
           }
-
-          const delayMs = getRetryDelayMs(err);
-          console.warn(`⚠️  Gemini transient error (attempt ${attempt + 1}/3), retrying in ${delayMs / 1000} s… (${err.message})`);
-          await sleep(delayMs);
-          continue;
+          throw err;
         }
-        throw err;
+      }
+    };
+
+    const providers = [];
+    providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
+    providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
+    providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+
+    const activeProviders = providers.filter(p => p.available);
+    let lastError = null;
+
+    for (const p of activeProviders) {
+      try {
+        console.log(`[aiClient] Calling LLM via provider: ${p.name} (Global Concurrency Locked)`);
+        const res = await p.fn();
+        return res;
+      } catch (err) {
+        console.warn(`⚠️ [aiClient] Provider ${p.name} failed: ${err.message}`);
+        lastError = err;
       }
     }
-  };
 
-  // Upgrade 1: Multi-Provider LLM Cascade (Accuracy-Based Priority)
-  // Regardless of env var, we prioritize by legal reasoning accuracy:
-  // 1. Gemini (Best accuracy, 1M context)
-  // 2. Groq (Fastest, good reasoning with Llama 3)
-  // 3. HuggingFace (Good fallback with Qwen)
-  // 4. Grok
-  const providers = [];
-  providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
-  providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
-  providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-  providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
-  providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
-
-  const activeProviders = providers.filter(p => p.available);
-  let lastError = null;
-
-  for (const p of activeProviders) {
+    console.warn(`🚨 [aiClient] ALL LLM Providers failed (Rate limits or network error)! Activating zero-latency Smart Local Fallback...`);
     try {
-      console.log(`[aiClient] Calling LLM via provider: ${p.name}`);
-      const res = await p.fn();
-      return res;
-    } catch (err) {
-      console.warn(`⚠️ [aiClient] Provider ${p.name} failed: ${err.message}`);
-      lastError = err;
+      return generateSmartLocalFallback(systemPrompt, userContent);
+    } catch (fallbackErr) {
+      console.error(`🚨 [aiClient] Fallback generator failed: ${fallbackErr.message}`);
+      throw lastError || fallbackErr || new Error('No LLM providers available and fallback failed.');
     }
-  }
-
-  console.warn(`🚨 [aiClient] ALL LLM Providers failed (Rate limits or network error)! Activating zero-latency Smart Local Fallback...`);
-  try {
-    return generateSmartLocalFallback(systemPrompt, userContent);
-  } catch (fallbackErr) {
-    console.error(`🚨 [aiClient] Fallback generator failed: ${fallbackErr.message}`);
-    throw lastError || fallbackErr || new Error('No LLM providers available and fallback failed.');
-  }
+  });
 }
 
 // ── Smart Local Playbook-Based Fallback Generator ───────────────────────────
