@@ -212,8 +212,56 @@ router.get(
   })
 );
 
+// ── GET /api/contracts/:id/stream ──────────────────────────────────────────────
+// Server-Sent Events stream for real-time AI processing updates.
+
+router.get(
+  '/:id/stream',
+  asyncHandler(async (req, res) => {
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!contract) throw new ApiError(404, 'Contract not found.');
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    res.write(\`data: \${JSON.stringify({ status: contract.status, message: 'Connected' })}\\n\\n\`);
+
+    const intervalId = setInterval(async () => {
+      const updatedContract = await Contract.findById(req.params.id);
+      if (!updatedContract) {
+        clearInterval(intervalId);
+        res.end();
+        return;
+      }
+
+      const queueJob = await QueueJob.findOne({ contractId: req.params.id });
+      
+      const payload = {
+        status: updatedContract.status,
+        overallRiskLevel: updatedContract.overallRiskLevel,
+        progress: queueJob ? queueJob.progress : 0,
+        step: queueJob ? queueJob.step : '',
+      };
+
+      res.write(\`data: \${JSON.stringify(payload)}\\n\\n\`);
+
+      if (updatedContract.status === 'done' || updatedContract.status === 'failed') {
+        clearInterval(intervalId);
+        res.end();
+      }
+    }, 1000);
+
+    req.on('close', () => {
+      clearInterval(intervalId);
+    });
+  })
+);
+
 // ── GET /api/contracts/:id ──────────────────────────────────────────────────
 // Fetch full contract object (without clauses).
+
 
 router.get(
   '/:id',

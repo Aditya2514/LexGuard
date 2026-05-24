@@ -14,6 +14,18 @@ export default function ContractChatSidebar({ contractId }) {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    const handleAskAi = (e) => {
+      const clauseText = e.detail;
+      const question = `What are the legal risks in this specific clause?\n\n"${clauseText}"`;
+      // Pre-fill the input but don't auto-send, so the user can edit it if they want.
+      // Or we can auto-send. Let's auto-send for better UX.
+      handleSend(question);
+    };
+    window.addEventListener('ask-ai-clause', handleAskAi);
+    return () => window.removeEventListener('ask-ai-clause', handleAskAi);
+  }, [contractId]); // handleSend is captured, but we just need it to run
+
   const handleSend = async (overrideText = null) => {
     const textToSend = typeof overrideText === 'string' ? overrideText : input;
     if (!textToSend.trim()) return;
@@ -39,7 +51,7 @@ export default function ContractChatSidebar({ contractId }) {
   ];
 
   return (
-    <div className="chat-sidebar glass-card">
+    <div className="chat-sidebar glass-card tour-chat-sidebar">
       <div className="chat-header">
         <h3>💬 Chat with Contract (Agent 5)</h3>
       </div>

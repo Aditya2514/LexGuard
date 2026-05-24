@@ -15,7 +15,7 @@ export default function ContractSummary({ contract, riskSummary }) {
             <span className="meta-status">{contract?.status}</span>
           </div>
         </div>
-        <div className="summary-risk-main">
+        <div className="summary-risk-main tour-risk-badge">
           <span className="risk-label">Overall Risk</span>
           <RiskBadge riskLevel={contract?.overallRiskLevel} />
         </div>
