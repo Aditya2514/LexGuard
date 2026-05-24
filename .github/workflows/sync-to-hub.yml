@@ -15,12 +15,24 @@ jobs:
         with:
           fetch-depth: 0 # Needs full history for subtree split
 
-      - name: Push Backend Subtree to Hugging Face
+      - name: Push Backend to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          # Split the backend folder into its own branch
-          git subtree split --prefix backend -b hf-deploy
+          # Create a fresh deployment directory
+          mkdir -p /tmp/hf-deploy
+          cp -r backend/* /tmp/hf-deploy/
+          cp -r backend/.* /tmp/hf-deploy/ 2>/dev/null || true
+          cd /tmp/hf-deploy
           
-          # Force push that branch to the Hugging Face Space main branch
-          git push -f https://Adity251105:$HF_TOKEN@huggingface.co/spaces/Adity251105/lexguard-backend hf-deploy:main
+          # Initialize fresh git repo to avoid historical large files
+          git init
+          git checkout -b main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add .
+          git commit -m "Deploy to Hugging Face"
+          
+          # Force push to Hugging Face Space
+          git push -f https://Adity251105:$HF_TOKEN@huggingface.co/spaces/Adity251105/lexguard-backend main
