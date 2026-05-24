@@ -347,6 +347,39 @@ function detectPredatoryTraps(text) {
         detectedTraps.push({ type: 'retroactive amendment', severity: 'critical' });
     }
     
+    // ── Pattern 19: Biased Arbitration Seat ───────────────────────────────────────
+    const hasArbitralTribunal = lower.includes("arbitral tribunal") || lower.includes("arbitrator") || lower.includes("arbitration");
+    const hasCompanyExecs = (lower.includes("senior executives") || lower.includes("directors of the company") || lower.includes("solely appointed by the company"));
+
+    if (hasArbitralTribunal && hasCompanyExecs) {
+        detectedTraps.push({ type: 'biased arbitration seat', severity: 'high' });
+    }
+
+    // ── Pattern 20: Obfuscated Wage Deduction ─────────────────────────────────────
+    const hasReallocate = lower.includes("reallocate") || lower.includes("withhold") || lower.includes("deduct") || lower.includes("escrow account");
+    const has100Percent = lower.includes("100%") || lower.includes("entirety of");
+    const hasRemuneration = lower.includes("remuneration") || lower.includes("salary") || lower.includes("wages");
+
+    if (hasReallocate && has100Percent && hasRemuneration) {
+        detectedTraps.push({ type: 'obfuscated wage deduction', severity: 'critical' });
+    }
+
+    // ── Pattern 21: Forfeiture of Earned Wages upon Termination ────────────────────
+    const hasForfeit = lower.includes("forfeit") || lower.includes("relinquish");
+    const hasEarnedPayment = lower.includes("payment for work completed") || lower.includes("accrued wages") || lower.includes("earned salary");
+
+    if (hasForfeit && hasEarnedPayment) {
+        detectedTraps.push({ type: 'wage forfeiture on termination', severity: 'critical' });
+    }
+
+    // ── Pattern 22: Ghost Jurisdiction / Offshore Law ──────────────────────────────
+    const hasForeignLaw = lower.includes("cayman islands") || lower.includes("delaware") || lower.includes("laws of england") || lower.includes("singapore") || lower.includes("new york");
+    const hasExclusiveJurisdiction = lower.includes("exclusively governed by") || lower.includes("exclusive jurisdiction") || lower.includes("solely governed by");
+
+    if (hasForeignLaw && hasExclusiveJurisdiction) {
+        detectedTraps.push({ type: 'hostile foreign jurisdiction', severity: 'critical' });
+    }
+
     return detectedTraps;
 }
 

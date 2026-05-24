@@ -32,14 +32,15 @@ You must classify the incoming contract text strictly into one of the following 
 - "dispute_resolution" (For mediation, arbitration, governing law, jurisdiction)
 - "compensation" (For salary, bonuses, retention, escrow forfeitures, pay metrics, statutory deductions, and liquidated damages/penalties related to financial forfeiture)
 - "intellectual_property" (For copyright, patents, moral waivers, work-for-hire)
-- "confidentiality" (For NDAs, trade secrets - NOT personal data privacy)
+- "confidentiality" (For NDAs, trade secrets, and non-disparagement - NOT personal data privacy)
 - "privacy_data" (For clauses mentioning DPDP Act, personal device monitoring, biometric data, or waiving personal data privacy rights)
 - "force_majeure" (For acts of god, pandemics, strikes, suspended obligations)
 - "indemnification" (For hold harmless, defense, liability shifts)
-- "liability_limit" (For clauses capping liability or excluding indirect damages)
+- "liability_limit" (For clauses capping the company's maximum liability or excluding indirect damages. Do NOT use for employee penalties, which fall under compensation.)
 - "termination" (For termination for convenience, cause, notice periods, and Garden Leave provisions)
 - "amendment" (For clauses dealing with modifications, unilateral changes, or retroactive policies)
 - "auto_renewal" (For evergreen renewals or automatic term extensions)
+- "other" (For general employment terms, active-term exclusivity, moonlighting, unpaid suspensions, or clauses that don't fit above)
 
 If a clause fits multiple, select the dominant operational mechanism. Do NOT output codes or alternate categories like 'arbitration' or 'payment'. Only the exact string tokens above are valid.
 

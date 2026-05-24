@@ -229,6 +229,24 @@ function cleanMixedMatrixDownstreamLeaks(clauseObj, text) {
         clauseObj.possible_law_references = [];
     }
 
+    // 4. Defang False Positives on Employee Non-Solicitation (TC_029)
+    if ((rawText.includes("poach") || rawText.includes("solicit") || rawText.includes("entice away")) && 
+        (rawText.includes("employees") || rawText.includes("current employees")) &&
+        (!rawText.includes("client") && !rawText.includes("customer") && !rawText.includes("prospect"))) {
+        
+        clauseObj.risk_level = "low";
+        clauseObj.risk_score = 1;
+        clauseObj.risk_reasons = ["Non-solicitation of employees (anti-poaching) is generally upheld in India, unlike non-solicitation of clients/customers which is struck down under Section 27."];
+        
+        if (clauseObj.possible_law_references) {
+            clauseObj.possible_law_references = clauseObj.possible_law_references.filter(
+                c => !(c.section_hint && c.section_hint.includes("27")) && 
+                     !(c.reason && c.reason.includes("Section 27")) &&
+                     !(c.act_name && c.act_name.includes("Section 27"))
+            );
+        }
+    }
+
     return clauseObj;
 }
 

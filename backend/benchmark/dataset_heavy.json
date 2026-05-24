@@ -1,0 +1,82 @@
+[
+  {
+    "id": "TC_H01_OBFUSCATED_WAGE_DEDUCTION",
+    "text": "As a gesture of mutual commitment to operational excellence, the Employee authorizes the Company to dynamically reallocate up to 100% of their accrued monthly remuneration into an inaccessible performance escrow account to cover hypothetical administrative latencies, without requiring prior judicial or administrative validation.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Payment of Wages Act / Contract Act - Unauthorized deductions and wage forfeiture."
+  },
+  {
+    "id": "TC_H02_CONTRADICTORY_SAFE_HARBOR_TRAP",
+    "text": "The Company shall act in strict conformance with the state Shops and Establishments framework when terminating this agreement. Notwithstanding the foregoing, the Company reserves the absolute right to terminate this agreement at any time for convenience, with zero notice, and the employee shall immediately forfeit all rights to payment for work completed prior to such termination.",
+    "expected_type": "termination",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Unconscionable termination without pay for completed work."
+  },
+  {
+    "id": "TC_H03_GHOST_JURISDICTION_ARBITRATION",
+    "text": "Any and all statutory, tort, or contractual claims shall be exclusively governed by the laws of the Cayman Islands, and subject to binding, non-appealable arbitration where the sole arbitrator shall be the Company's Chief Financial Officer.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Arbitration and Conciliation Act - Biased arbitrator (CFO) and foreign jurisdiction trap."
+  },
+  {
+    "id": "TC_H04_BURIED_MORAL_RIGHTS_WAIVER",
+    "text": "The creator retains profound respect for their creations; however, to ensure seamless corporate integration, they permanently waive any and all moral rights, including the right to object to any derogatory modification under Section 57.",
+    "expected_type": "intellectual_property",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Copyright Act, Section 57 - Waiver of moral rights."
+  },
+  {
+    "id": "TC_H05_STEALTH_POST_TERM_EXCLUSIVITY",
+    "text": "While employed, the Employee agrees to devote their full attention to the Company. To protect the Company's trade secrets, this active-term exclusivity requirement shall survive and remain binding for a period of 60 months post-employment, during which the Employee shall not compete with the Company.",
+    "expected_type": "non_compete",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 Contract Act - Post-employment non-compete restraint."
+  },
+  {
+    "id": "TC_H06_DATA_HOSTAGE_CLAUSE",
+    "text": "The Employee enthusiastically consents to the Company installing persistent, kernel-level surveillance daemons on all personal devices and completely waives their rights to object under the Digital Personal Data Protection Act.",
+    "expected_type": "privacy_data",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "DPDP Act - Unconscionable surveillance and forced waiver of privacy rights."
+  },
+  {
+    "id": "TC_H07_LIQUIDATED_DAMAGES_MASQUERADING_AS_TRAINING",
+    "text": "The Company invests heavily in its workforce. Should the Employee fail to complete the 3-year term, they must pay a penalty of INR 20,000,000 as liquidated damages, regardless of the actual costs incurred for their training.",
+    "expected_type": "compensation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 74 Contract Act - Penalty clause disguised as training bond."
+  },
+  {
+    "id": "TC_H08_MUTUAL_NON_SOLICIT_CLIENTS",
+    "text": "Both parties mutually agree that, upon separation, neither shall directly or indirectly solicit, accept business from, or service any client, customer, or prospect of the other party anywhere in the world.",
+    "expected_type": "non_solicitation",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Section 27 Contract Act - Broad client non-solicitation functioning as a non-compete."
+  },
+  {
+    "id": "TC_H09_POSH_ARBITRATION_GAG_ORDER",
+    "text": "To protect the dignity of all parties, any allegations regarding sexual harassment or discrimination shall be diverted away from public courts and subject exclusively to private, binding arbitration bound by strict non-disclosure.",
+    "expected_type": "dispute_resolution",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "POSH Act - Forcing statutory sexual harassment claims into private arbitration."
+  },
+  {
+    "id": "TC_H10_RETROACTIVE_AT_WILL_AMENDMENT",
+    "text": "The Company may, at its sole discretion, amend, alter, or revoke any clause of this agreement. The Employee agrees to be bound by such changes retroactively to the initial date of hire.",
+    "expected_type": "amendment",
+    "expected_risk": "CRITICAL",
+    "expected_violation": true,
+    "legal_hook": "Contract Act - Unilateral retroactive amendment without consent."
+  }
+]
