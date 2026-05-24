@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import html2pdf from 'html2pdf.js';
+import Joyride, { STATUS } from 'react-joyride';
 import { getContract, getRiskSummary, getClausesDetailed } from '../api/lexguardClient';
 import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
@@ -12,13 +13,99 @@ export default function ContractDetailPage() {
   const [riskSummary, setRiskSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Joyride Tour State
+  const [runTour, setRunTour] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('lexguard_tour_seen')) {
+      setRunTour(true);
+    }
+  }, []);
+
+  const handleJoyrideCallback = (data) => {
+    const { status } = data;
+    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+      localStorage.setItem('lexguard_tour_seen', 'true');
+      setRunTour(false);
+    }
+  };
+
+  const steps = [
+    {
+      target: '.tour-risk-badge',
+      content: 'This is the Overall Risk Level for the entire contract. We flag the most dangerous clauses automatically.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '.tour-clause-table',
+      content: 'Here is the detailed, clause-by-clause breakdown. Expand any row to see AI rewrites and Indian Law citations.',
+      placement: 'top',
+    },
+    {
+      target: '.tour-chat-sidebar',
+      content: 'Have a specific question? Ask our legal AI agent directly. You can even click "Ask AI" on any clause to deep-link it here!',
+      placement: 'left',
+    }
+  ];
 
   useEffect(() => {
     if (!id) return;
 
     let isMounted = true;
-    let pollInterval = null;
-    let consecutiveErrors = 0;
+    let streamReader = null;
+    let pollInterval = null; // fallback
+    let lastProgress = -1;
+    let lastStatus = '';
+
+    const startSSE = async () => {
+      const BASE = import.meta.env.VITE_API_URL || '/api';
+      const token = localStorage.getItem('lexguard_token');
+      try {
+        const res = await fetch(`${BASE}/contracts/${id}/stream`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!res.ok) throw new Error('Stream failed');
+        streamReader = res.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await streamReader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\\n');
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.replace('data: ', ''));
+                if (data.progress !== lastProgress || data.status !== lastStatus) {
+                  lastProgress = data.progress;
+                  lastStatus = data.status;
+                  // Fetch updated components silently because data changed
+                  Promise.all([getContract(id), getRiskSummary(id)])
+                    .then(([cData, sData]) => {
+                      if (!isMounted) return;
+                      setContract(cData);
+                      setRiskSummary(sData);
+                    }).catch(()=>{});
+                }
+                if (data.status === 'done' || data.status === 'failed') {
+                  streamReader.cancel();
+                  return;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+      } catch (err) {
+        // fallback to polling on stream fail
+        if (isMounted && !pollInterval) {
+           pollInterval = setInterval(() => fetchData(false), 3000);
+        }
+      }
+    };
 
     const fetchData = (showLoading = false) => {
       if (showLoading) setLoading(true);
@@ -26,41 +113,17 @@ export default function ContractDetailPage() {
       Promise.all([getContract(id), getRiskSummary(id)])
         .then(([contractData, summaryData]) => {
           if (!isMounted) return;
-          consecutiveErrors = 0; // Reset on success
           setContract(contractData);
           setRiskSummary(summaryData);
           setError('');
 
           const isAnalyzing = contractData.status === 'processing' || contractData.status === 'pending';
-          if (isAnalyzing && !pollInterval) {
-            pollInterval = setInterval(() => fetchData(false), 3000);
-          } else if (!isAnalyzing && pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
+          if (isAnalyzing && !streamReader && !pollInterval) {
+            startSSE();
           }
         })
         .catch((err) => {
-          if (!isMounted) return;
-          
-          // Tolerate transient 502/503 or network ERR_FAILED errors (e.g. Render restarts)
-          const isNetworkOr5xx = !err.status || err.status >= 500;
-          if (isNetworkOr5xx) {
-            consecutiveErrors++;
-            if (consecutiveErrors < 15) {
-              console.warn(`Transient network error (${consecutiveErrors}/15), retrying...`, err.message);
-              // If initial fetch failed on cold start, start polling anyway to recover
-              if (!pollInterval) {
-                pollInterval = setInterval(() => fetchData(false), 3000);
-              }
-              return;
-            }
-          }
-
-          setError(err.message);
-          if (pollInterval) {
-            clearInterval(pollInterval);
-            pollInterval = null;
-          }
+          if (isMounted) setError(err.message);
         })
         .finally(() => {
           if (isMounted) setLoading(false);
@@ -71,6 +134,7 @@ export default function ContractDetailPage() {
 
     return () => {
       isMounted = false;
+      if (streamReader) streamReader.cancel();
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [id]);
@@ -514,6 +578,20 @@ export default function ContractDetailPage() {
 
   return (
     <div className="page-container">
+      <Joyride
+        steps={steps}
+        run={runTour}
+        continuous={true}
+        showProgress={true}
+        showSkipButton={true}
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#10b981',
+            zIndex: 10000,
+          }
+        }}
+      />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <Link to="/dashboard" className="btn btn-ghost" id="back-to-list">← All Contracts</Link>
         <div style={{ display: 'flex', gap: '0.75rem' }}>

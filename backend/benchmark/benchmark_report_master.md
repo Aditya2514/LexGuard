@@ -1,10 +1,10 @@
 # 🏛️ LexGuard Core AI Engine Benchmark Quality Report
-Generated At: 2026-05-24T13:42:20.503Z
+Generated At: 2026-05-24T14:44:25.088Z
 
 ### Core Evaluation Diagnostics Metrics
 * **Total Audited Test Cases:** 30
 * **Agent 1 Classification Accuracy:** 100.00% (30/30)
-* **Agent 2/2.5 Risk Assessment Accuracy:** 100.00% (30/30)
+* **Agent 2/2.5 Risk Assessment Accuracy:** 96.67% (29/30)
 * **System False Positive Rate:** 0 occurrences
 * **System False Negative Rate:** 0 occurrences
 * **Agent 3 Average Rewrite Quality Grade:** 5.00/10
@@ -26,7 +26,7 @@ Generated At: 2026-05-24T13:42:20.503Z
 | TC_010_TRAINING_BOND_PENALTY | compensation / CRITICAL | compensation / CRITICAL | ✅ PASS | 5/10 |
 | TC_011_NON_SOLICIT_BROAD | non_solicitation / CRITICAL | non_solicitation / CRITICAL | ✅ PASS | 5/10 |
 | TC_012_UNILATERAL_VARIATION | compensation / CRITICAL | compensation / CRITICAL | ✅ PASS | 5/10 |
-| TC_013_FOREIGN_JURISDICTION | dispute_resolution / HIGH | dispute_resolution / HIGH | ✅ PASS | 5/10 |
+| TC_013_FOREIGN_JURISDICTION | dispute_resolution / HIGH | dispute_resolution / CRITICAL | ❌ MISMATCH | 5/10 |
 | TC_014_INDEFINITE_PROBATION | termination / HIGH | termination / HIGH | ✅ PASS | 5/10 |
 | TC_015_MANDATORY_ARBITRATION_CRIMINAL | dispute_resolution / CRITICAL | dispute_resolution / CRITICAL | ✅ PASS | 5/10 |
 | TC_016_EXCLUSIVITY_SAFE_HARBOR | other / LOW | other / LOW | ✅ PASS | 10/10 |

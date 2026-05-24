@@ -81,7 +81,7 @@ export default function ClauseTable({ contractId, contractStatus }) {
   }
 
   return (
-    <div className="clause-table-wrapper glass-card fade-in" id="clause-table">
+    <div className="clause-table-wrapper glass-card fade-in tour-clause-table" id="clause-table">
       <div className="clause-table-header">
         <h2 className="section-heading">Clause Analysis</h2>
         <div className="clause-search-bar-wrapper">
@@ -235,7 +235,19 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
             <div className="expanded-content fade-in">
               {/* Full clause text */}
               <div className="expanded-section">
-                <h4 className="expanded-label">Full Clause Text</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h4 className="expanded-label" style={{ margin: 0 }}>Full Clause Text</h4>
+                  <button 
+                    className="btn btn-ghost"
+                    style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', border: '1px solid var(--accent-color)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(new CustomEvent('ask-ai-clause', { detail: clause.rawText }));
+                    }}
+                  >
+                    💬 Ask AI About This
+                  </button>
+                </div>
                 <p className="expanded-text">{clause.rawText}</p>
               </div>
 
