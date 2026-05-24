@@ -23,6 +23,10 @@ jobs:
           mkdir -p /tmp/hf-deploy
           cp -r backend/* /tmp/hf-deploy/
           cp -r backend/.* /tmp/hf-deploy/ 2>/dev/null || true
+          
+          # Remove data directory (contains heavy PDFs) to avoid HuggingFace LFS rejection
+          rm -rf /tmp/hf-deploy/data
+          
           cd /tmp/hf-deploy
           
           # Initialize fresh git repo to avoid historical large files
