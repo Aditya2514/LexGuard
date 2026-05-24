@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import html2pdf from 'html2pdf.js';
-import Joyride, { STATUS } from 'react-joyride';
+import { Joyride, STATUS } from 'react-joyride';
 import { getContract, getRiskSummary, getClausesDetailed } from '../api/lexguardClient';
 import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
