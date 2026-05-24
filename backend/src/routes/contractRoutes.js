@@ -95,7 +95,7 @@ router.post(
       throw new ApiError(429, 'Monthly contract quota exceeded. Please upgrade your plan.');
     }
 
-    const { contractCategory } = req.body;
+    const { contractCategory, parentContractId } = req.body;
 
     if (!contractCategory || !CONTRACT_CATEGORIES.includes(contractCategory)) {
       deleteTempFile(req.file.path);
@@ -125,6 +125,7 @@ router.post(
       // 3. Persist Contract document
       contract = await Contract.create({
         userId: req.user._id,
+        parentContractId: parentContractId || null,
         originalFileName: req.file.originalname,
         contractCategory,
         rawText: cleanedText,

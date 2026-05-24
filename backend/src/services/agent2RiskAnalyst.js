@@ -288,6 +288,52 @@ function enforcePredatoryTrapEscalation(clauseObj, text) {
     return clauseObj;
 }
 
+// ── Phase 1: Selective Reflection Loop (Self-Healing) ────────────────────────
+async function triggerReflectionLoop(clauseObj, clauseText, globalContext) {
+    const { callLLM } = require('./aiClient');
+    console.log(`🔄 [Reflection Loop] Triggered for Clause ${clauseObj.id}. LLM failed to identify predatory traps.`);
+    
+    const correctionPrompt = `
+    You previously evaluated the following clause:
+    "${clauseText}"
+
+    You gave it a risk level of "${clauseObj.risk_level}" (Score: ${clauseObj.risk_score}).
+    
+    However, our deterministic legal guardrails detected the following predatory traps that you MISSED or UNDER-RATED:
+    ${JSON.stringify(clauseObj.risk_reasons)}
+
+    This is a critical oversight. A human lawyer would flag this as highly dangerous.
+    
+    TASK:
+    Re-evaluate the clause. You MUST output a JSON object with a risk_level of "high" or "critical", and provide an updated, detailed "risk_reasons" array explaining why this specific predatory mechanism is dangerous for the user. Do not invent boilerplate; explain the exact trap detected.
+    `;
+
+    try {
+        const resp = await callLLM({
+            systemPrompt: SYSTEM_PROMPT,
+            userContent: correctionPrompt,
+            jsonMode: true,
+            temperature: 0.1, // Highly deterministic for corrections
+            maxTokens: 1024,
+        });
+
+        // The LLM returns a full JSON object for the clause, or a "results" array.
+        const correctedResult = (resp.results && resp.results[0]) || resp;
+
+        return {
+            ...clauseObj,
+            risk_level: correctedResult.risk_level || 'high',
+            risk_score: correctedResult.risk_score || 8,
+            risk_reasons: Array.isArray(correctedResult.risk_reasons) ? correctedResult.risk_reasons : clauseObj.risk_reasons,
+            possible_law_references: correctedResult.possible_law_references || clauseObj.possible_law_references,
+            reflection_triggered: true // Flag for debugging
+        };
+    } catch (error) {
+        console.error(`⚠️ [Reflection Loop] Failed to self-heal clause ${clauseObj.id}:`, error.message);
+        return clauseObj; // Fallback to the statically escalated object
+    }
+}
+
 async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
   const formattedBatch = clausesBatch.map((c) => {
     if (!globalContext) return c;
@@ -434,7 +480,14 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     resultObj = cleanMixedMatrixDownstreamLeaks(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
     // V6 Predatory Trap Escalation (deterministic safety net)
+    const previousScore = resultObj.risk_score;
     resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
+
+    // Phase 1: Selective Reflection Loop (Self-Healing)
+    if (resultObj.risk_score > previousScore) {
+        // The deterministic engine escalated the score, meaning the LLM failed. Trigger self-healing!
+        resultObj = await triggerReflectionLoop(resultObj, clauseTextMap[baseAnalysis.id] || "", globalContext);
+    }
 
     // Sanitize law refs mapped to strict schema keys
     resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
@@ -497,7 +550,17 @@ function computeOverallRisk(clauseRiskLevels) {
  * @param {string} contractId
  */
 async function analyseRisksForContract(contractId) {
-  const contract = await Contract.findById(contractId).select('globalContext contractCategory');
+  const contract = await Contract.findById(contractId).select('globalContext contractCategory parentContractId');
+  
+  // Phase 3: Cross-Contract Knowledge Graph Retrieval
+  let enhancedGlobalContext = contract?.globalContext || {};
+  if (contract.parentContractId) {
+    const parentContract = await Contract.findById(contract.parentContractId).select('globalContext originalFileName');
+    if (parentContract) {
+      enhancedGlobalContext.parentContractConstraints = `This contract is a child of the Master Agreement '${parentContract.originalFileName}'. The following constraints apply: ${JSON.stringify(parentContract.globalContext)}`;
+    }
+  }
+
   const clauses = await Clause.find({
     contractId,
     risk_level: null,
@@ -522,7 +585,7 @@ async function analyseRisksForContract(contractId) {
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
       const task = async () => {
-        const results = await runAgent2RiskAnalyst(batch, contract?.globalContext);
+        const results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
         return results.map((r) => ({
           updateOne: {
             filter: { _id: r.id },
