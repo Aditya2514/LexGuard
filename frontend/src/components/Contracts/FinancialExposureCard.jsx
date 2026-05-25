@@ -12,9 +12,25 @@ export default function FinancialExposureCard({ financialObligations = [], total
     );
   }
 
-  // Format currency dynamically based on the first item's currency, defaulting to INR
+  // Safe currency formatter to prevent RangeError from invalid AI-generated currency codes
+  const formatCurrency = (amount, currencyCode) => {
+    try {
+      const code = (typeof currencyCode === 'string' && currencyCode.trim().length === 3) 
+        ? currencyCode.trim().toUpperCase() 
+        : 'INR';
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(amount);
+    } catch (e) {
+      // Fallback if the 3-letter code was still invalid (e.g., 'XXX')
+      try {
+        return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+      } catch (err) {
+        return `INR ${amount}`;
+      }
+    }
+  };
+
   const primaryCurrency = financialObligations[0]?.currency || 'INR';
-  const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: primaryCurrency, maximumFractionDigits: 0 }).format(totalExposure);
+  const formattedTotal = formatCurrency(totalExposure, primaryCurrency);
 
   return (
     <div className="glass-panel" style={{ 
@@ -51,7 +67,7 @@ export default function FinancialExposureCard({ financialObligations = [], total
           <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#7f1d1d', fontSize: '0.9rem' }}>
             {financialObligations.map((obl, idx) => (
               <li key={idx} style={{ marginBottom: '0.25rem' }}>
-                <strong>{new Intl.NumberFormat('en-IN', { style: 'currency', currency: obl.currency || 'INR', maximumFractionDigits: 0 }).format(obl.amount)}</strong> - {obl.description}
+                <strong>{formatCurrency(obl.amount, obl.currency)}</strong> - {obl.description}
               </li>
             ))}
           </ul>
