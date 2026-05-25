@@ -57,6 +57,7 @@ const clauseSchema = new mongoose.Schema(
       },
     },
     risk_score: { type: Number, min: 0, max: 10, default: null },
+    confidence_score: { type: Number, min: 1, max: 10, default: null },
     risk_reasons: { type: [String], default: [] },
     possible_law_references: { type: [lawReferenceSchema], default: [] },
 

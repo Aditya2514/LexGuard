@@ -61,7 +61,7 @@ export default function ClauseTable({ contractId, contractStatus }) {
       }
 
       return true;
-    });
+    }).sort((a, b) => (a.segmentIndex || 0) - (b.segmentIndex || 0));
   }, [clauses, filterRisk, filterType, filterCompliance, searchQuery]);
 
   const toggleExpand = (id) => {
@@ -221,7 +221,7 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
         <td className="clause-type-cell">
           <ClauseTypeBadge type={clause.clause_type} />
         </td>
-        <td><RiskBadge riskLevel={clause.risk_level} /></td>
+        <td><RiskBadge riskLevel={clause.risk_level} confidenceScore={clause.confidence_score} /></td>
         <td><ComplianceBadge level={clause.compliance_risk_level || 'low'} /></td>
         <td className="clause-preview">{preview}</td>
         <td className="law-count">
@@ -406,6 +406,9 @@ function ClauseTypeBadge({ type }) {
     case 'termination': icon = '🚪'; break;
     case 'confidentiality': icon = '🤫'; break;
     case 'data_privacy': icon = '🔒'; break;
+    case 'disclosure': icon = '🔍'; break;
+    case 'timeline_performance': icon = '⏳'; break;
+    case 'delivery_possession': icon = '🔑'; break;
     default: icon = '📄'; break;
   }
 

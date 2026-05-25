@@ -2,8 +2,21 @@ import RiskBadge from './RiskBadge';
 import FinancialExposureCard from './FinancialExposureCard';
 import './ContractSummary.css';
 
-export default function ContractSummary({ contract, riskSummary }) {
-  const breakdown = riskSummary?.riskBreakdown || {};
+export default function ContractSummary({ contract, clauses = [] }) {
+  const breakdown = {
+    low: clauses.filter(c => c.risk_level === 'low').length,
+    medium: clauses.filter(c => c.risk_level === 'medium').length,
+    high: clauses.filter(c => c.risk_level === 'high').length,
+    critical: clauses.filter(c => c.risk_level === 'critical').length,
+  };
+  
+  const compBreakdown = {
+    low: clauses.filter(c => (c.compliance_risk_level || 'low') === 'low').length,
+    medium: clauses.filter(c => c.compliance_risk_level === 'medium').length,
+    high: clauses.filter(c => c.compliance_risk_level === 'high').length,
+  };
+
+  const hrRecommendedCount = clauses.filter(c => c.human_review_strongly_recommended).length;
 
   return (
     <div className={`contract-summary glass-card fade-in risk-border-${contract?.overallRiskLevel || 'low'}`} id="contract-summary">
@@ -39,13 +52,13 @@ export default function ContractSummary({ contract, riskSummary }) {
       <div className="compliance-panel glass-panel">
         <h4 className="compliance-panel-title">🇮🇳 Indian Law Compliance Summary</h4>
         <div className="compliance-breakdown">
-          <ComplianceCount label="Low Risk" count={riskSummary?.complianceBreakdown?.low || 0} level="low" />
-          <ComplianceCount label="Med Risk" count={riskSummary?.complianceBreakdown?.medium || 0} level="medium" />
-          <ComplianceCount label="High Risk" count={riskSummary?.complianceBreakdown?.high || 0} level="high" />
+          <ComplianceCount label="Low Risk" count={compBreakdown.low || 0} level="low" />
+          <ComplianceCount label="Med Risk" count={compBreakdown.medium || 0} level="medium" />
+          <ComplianceCount label="High Risk" count={compBreakdown.high || 0} level="high" />
         </div>
-        {riskSummary?.complianceReviewRecommendedCount > 0 && (
+        {hrRecommendedCount > 0 && (
           <div className="compliance-alert-pill animate-pulse" id="compliance-lawyer-alert">
-            <span>⚠️ Human review strongly recommended for {riskSummary.complianceReviewRecommendedCount} clause{riskSummary.complianceReviewRecommendedCount > 1 ? 's' : ''} under Indian Law.</span>
+            <span>⚠️ Human review strongly recommended for {hrRecommendedCount} clause{hrRecommendedCount > 1 ? 's' : ''} under Indian Law.</span>
           </div>
         )}
       </div>

@@ -15,7 +15,7 @@ const exportRedlineToDocx = asyncHandler(async (req, res) => {
     }
 
     const clauses = await Clause.find({ contractId: contract._id })
-        .sort({ order: 1 })
+        .sort({ segmentIndex: 1 })
         .lean();
 
     if (!clauses || clauses.length === 0) {
