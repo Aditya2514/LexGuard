@@ -21,7 +21,8 @@ const jobQueueService = require('../services/jobQueueService');
 const QueueJob = require('../models/QueueJob');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
-const { storage } = require('../services/gridFsStorage');
+const { getFileStream } = require('../services/gridFsStorage');
+const mongoose = require('mongoose');
 
 // ── Multer Setup ────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ const fileFilter = (_req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
 });
@@ -80,6 +81,26 @@ router.post(
     let contract = null;
 
     try {
+      // 0. Manual GridFS Upload to bypass outdated multer-gridfs-storage library
+      const gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+      const { Readable } = require('stream');
+      const crypto = require('crypto');
+      const filename = crypto.randomBytes(16).toString('hex') + path.extname(req.file.originalname);
+      
+      const uploadStream = gfsBucket.openUploadStream(filename, {
+        contentType: req.file.mimetype,
+      });
+      
+      Readable.from(req.file.buffer).pipe(uploadStream);
+      
+      await new Promise((resolve, reject) => {
+        uploadStream.on('finish', resolve);
+        uploadStream.on('error', reject);
+      });
+
+      req.file.id = uploadStream.id;
+      req.file.filename = filename;
+
       // 1. Extract and clean text from the uploaded file
       const cleanedText = await extractText(req.file.id, req.file.originalname);
 
