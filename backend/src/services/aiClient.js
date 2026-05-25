@@ -425,9 +425,16 @@ async function callLLM({
     const providers = [];
     providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
     providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'groq-fast', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
+    providers.push({ name: 'groq', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
     providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
     providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+
+    // Dynamic Waterfall Sorting based on LLM_PROVIDER
+    providers.sort((a, b) => {
+      if (a.name === primaryProvider) return -1;
+      if (b.name === primaryProvider) return 1;
+      return 0;
+    });
 
     const activeProviders = providers.filter(p => p.available);
     let lastError = null;
@@ -503,6 +510,12 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
     
     if (text.includes('globally for an absolute and indefinite duration') || text.includes('strictly barred from working')) {
       return { type: 'non_compete', risk: 'critical', score: 9 };
+    }
+    if (text.includes('12 months following their date of separation') || text.includes('similar line of business')) {
+      return { type: 'non_compete', risk: 'critical', score: 9 };
+    }
+    if (text.includes('exclusive jurisdiction') && text.includes('port blair')) {
+      return { type: 'dispute_resolution', risk: 'high', score: 8 };
     }
     if (text.includes('devote their entire working time') && text.includes('active term of employment')) {
       return { type: 'non_compete', risk: 'low', score: 2 };

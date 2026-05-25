@@ -11,6 +11,10 @@ const { generateUserAdvocateForContract } = require('./agent3UserAdvocate');
 const { runComplianceCheckForContract } = require('./agent4ComplianceChecker');
 const { runAdversaryRedTeamForContract } = require('./agent6Adversary');
 const { dispatchWebhooks } = require('./webhookDispatcher');
+const pLimit = require('p-limit');
+
+const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+const workerLimit = limitFn(3); // Process up to 3 contracts concurrently
 
 const QUEUE_NAME = 'lexguard:queue';
 let workerActive = false;
@@ -117,13 +121,22 @@ async function processContractJob(contractId) {
  * High-performance reactive worker loop using Redis BRPOP
  */
 async function runRedisWorker() {
-  console.log('🤖 [Queue Worker] Reactive Redis Queue Worker Started.');
+  console.log('🤖 [Queue Worker] Reactive Redis Queue Worker Started (Concurrency: 3).');
   while (workerActive && safeRedis.isAvailable()) {
     try {
+      if (workerLimit.activeCount >= 3) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        continue;
+      }
+      
       const contractId = await safeRedis.brPop(QUEUE_NAME, 2);
       if (contractId) {
         console.log(`🤖 [Queue Worker] Popped contract job: ${contractId} from Redis`);
-        await processContractJob(contractId);
+        
+        // Execute concurrently without awaiting the worker thread
+        workerLimit(async () => {
+          await processContractJob(contractId);
+        }).catch(err => console.error(`⚠️ Async worker failed for job ${contractId}:`, err.message));
       }
     } catch (err) {
       console.error('⚠️  Redis worker encountered polling error:', err.message);
@@ -150,6 +163,11 @@ async function runMongoWorkerPoll() {
     console.log('🔌 Redis is back online! Transitioning worker to high-performance Redis mode...');
     clearInterval(workerIntervalId);
     runRedisWorker();
+    return;
+  }
+
+  // Prevent polling if we are already at max concurrency
+  if (workerLimit.activeCount >= 3) {
     return;
   }
 
@@ -188,12 +206,14 @@ async function runMongoWorkerPoll() {
         return;
       }
 
-      await processContractJob(nextJob.contractId);
-      
-      // Unlock job upon successful or handled failure completion
-      await QueueJob.findByIdAndUpdate(nextJob._id, {
-        $set: { lockedAt: null, lockedBy: null }
-      });
+      workerLimit(async () => {
+        await processContractJob(nextJob.contractId);
+        
+        // Unlock job upon successful or handled failure completion
+        await QueueJob.findByIdAndUpdate(nextJob._id, {
+          $set: { lockedAt: null, lockedBy: null }
+        });
+      }).catch(err => console.error(`⚠️ Async Mongo worker failed for job ${nextJob.contractId}:`, err.message));
     }
   } catch (err) {
     console.error('❌ [Queue Worker] MongoDB worker polling failed:', err.message);

@@ -44,7 +44,7 @@ async function runAdversaryOnBatch(clausesBatch) {
       jsonMode: true,
       temperature: 0.7, // Higher temp for creative loophole finding
       maxTokens: 4096,
-      modelOverride: 'gemini-1.5-flash-latest' // Model Cascading: Use fast model
+      modelOverride: 'gemini-2.5-flash' // Model Cascading: Use fast model
     });
 
     return resp.results || [];

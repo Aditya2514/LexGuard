@@ -42,6 +42,8 @@ You must classify the incoming contract text strictly into one of the following 
 - "auto_renewal" (For evergreen renewals or automatic term extensions)
 - "other" (For general employment terms, active-term exclusivity, moonlighting, unpaid suspensions, or clauses that don't fit above)
 
+TRAP DETECTION WARNING: Look out for legal misdirection. If a clause starts like a standard non-disparagement or confidentiality clause, but the second half enforces massive financial penalties (e.g., "forfeiture of equity", "loss of unpaid bonuses", "liquidated damages"), you MUST classify it as "compensation". Financial pain ALWAYS supersedes the label of the clause.
+
 If a clause fits multiple, select the dominant operational mechanism. Do NOT output codes or alternate categories like 'arbitration' or 'payment'. Only the exact string tokens above are valid.
 
 Rules:
