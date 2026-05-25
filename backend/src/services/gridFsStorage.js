@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { GridFSBucket } = require('mongodb');
+const { GridFSBucket } = mongoose.mongo;
 const crypto = require('crypto');
 const path = require('path');
 const { GridFsStorage } = require('multer-gridfs-storage');
@@ -36,14 +36,17 @@ mongoose.connection.once('open', () => {
 
 /**
  * Returns a readable stream for a given GridFS file id
- * @param {ObjectId} fileId 
+ * @param {ObjectId|string} fileId 
  * @returns {ReadableStream}
  */
 const getFileStream = (fileId) => {
   if (!gfsBucket) {
     throw new Error('GridFSBucket is not initialized yet.');
   }
-  return gfsBucket.openDownloadStream(fileId);
+  // Reparse the ObjectId using Mongoose's internal BSON to avoid BSONVersionError conflicts
+  // between different versions of the mongodb driver.
+  const parsedId = new mongoose.Types.ObjectId(fileId.toString());
+  return gfsBucket.openDownloadStream(parsedId);
 };
 
 module.exports = {
