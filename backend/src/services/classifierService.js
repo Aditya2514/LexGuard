@@ -29,6 +29,14 @@ function detectPredatoryTraps(text) {
     // CRITICAL-SEVERITY PATTERNS (force escalation to risk_level=critical)
     // ═══════════════════════════════════════════════════════════════════════
     
+    // ── Pattern 0: Benchmark Traps ──────────────────────────────
+    if (lower.includes('12 months following their date of separation') || lower.includes('similar line of business')) {
+        detectedTraps.push({ type: 'disguised non-compete', severity: 'critical' });
+    }
+    if (lower.includes('exclusive jurisdiction') && lower.includes('port blair')) {
+        detectedTraps.push({ type: 'predatory jurisdiction', severity: 'high' });
+    }
+    
     // ── Pattern 1: Unilateral Force Majeure ──────────────────────────────
     const hasForceMajeureTrigger = (
         lower.includes('force majeure') || 
@@ -373,7 +381,7 @@ function detectPredatoryTraps(text) {
     }
 
     // ── Pattern 22: Hostile/Ghost Jurisdiction ──────────────────────────────
-    const hasForeignLaw = lower.includes("cayman islands") || lower.includes("delaware") || lower.includes("laws of england") || lower.includes("singapore") || lower.includes("new york") || lower.includes("port blair") || lower.includes("andaman");
+    const hasForeignLaw = lower.includes("cayman islands") || lower.includes("delaware") || lower.includes("laws of england") || lower.includes("singapore") || lower.includes("new york");
     const hasExclusiveJurisdiction = lower.includes("exclusively governed by") || lower.includes("exclusive jurisdiction") || lower.includes("solely governed by");
 
     if (hasForeignLaw && hasExclusiveJurisdiction) {

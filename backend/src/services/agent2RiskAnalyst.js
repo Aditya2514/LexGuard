@@ -462,8 +462,8 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     if (level === 'critical' && score < 8) score = 8;
     if (level === 'high' && score < 6)     score = 6;
     // Conversely, if the score is high but the level is low, escalate level
-    if (score >= 8 && level === 'low')     level = 'critical';
-    if (score >= 6 && score < 8 && level === 'low') level = 'high';
+    if (score >= 8 && level !== 'critical') level = 'critical';
+    if (score >= 6 && score < 8 && level !== 'critical' && level !== 'high') level = 'high';
     
     let resultObj = {
       id: baseAnalysis.id,
