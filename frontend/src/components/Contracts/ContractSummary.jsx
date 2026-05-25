@@ -2,21 +2,16 @@ import RiskBadge from './RiskBadge';
 import FinancialExposureCard from './FinancialExposureCard';
 import './ContractSummary.css';
 
-export default function ContractSummary({ contract, clauses = [] }) {
-  const breakdown = {
-    low: clauses.filter(c => c.risk_level === 'low').length,
-    medium: clauses.filter(c => c.risk_level === 'medium').length,
-    high: clauses.filter(c => c.risk_level === 'high').length,
-    critical: clauses.filter(c => c.risk_level === 'critical').length,
+export default function ContractSummary({ contract, riskSummary }) {
+  const breakdown = riskSummary?.riskBreakdown || {
+    low: 0, medium: 0, high: 0, critical: 0
   };
   
-  const compBreakdown = {
-    low: clauses.filter(c => (c.compliance_risk_level || 'low') === 'low').length,
-    medium: clauses.filter(c => c.compliance_risk_level === 'medium').length,
-    high: clauses.filter(c => c.compliance_risk_level === 'high').length,
+  const compBreakdown = riskSummary?.complianceBreakdown || {
+    low: 0, medium: 0, high: 0
   };
 
-  const hrRecommendedCount = clauses.filter(c => c.human_review_strongly_recommended).length;
+  const hrRecommendedCount = riskSummary?.complianceReviewRecommendedCount || 0;
 
   return (
     <div className={`contract-summary glass-card fade-in risk-border-${contract?.overallRiskLevel || 'low'}`} id="contract-summary">
