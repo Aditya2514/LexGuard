@@ -89,7 +89,39 @@ const contractSchema = new mongoose.Schema(
       default: () => ({}),
     },
   },
-  { timestamps: true }
+  { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );
+
+contractSchema.virtual('clauses', {
+  ref: 'Clause',
+  localField: '_id',
+  foreignField: 'contractId'
+});
+
+contractSchema.virtual('risk_summary').get(function() {
+  if (!this.clauses) return null; // Only works if clauses are populated
+  
+  const breakdown = { low: 0, medium: 0, high: 0, critical: 0 };
+  const compBreakdown = { low: 0, medium: 0, high: 0 };
+  let hrRecommended = 0;
+
+  for (const c of this.clauses) {
+    const risk = c.risk_level || 'low';
+    if (breakdown[risk] !== undefined) breakdown[risk]++;
+
+    const compRisk = c.compliance_risk_level || 'low';
+    if (compBreakdown[compRisk] !== undefined) compBreakdown[compRisk]++;
+
+    if (c.human_review_strongly_recommended) {
+      hrRecommended++;
+    }
+  }
+
+  return {
+    riskBreakdown: breakdown,
+    complianceBreakdown: compBreakdown,
+    complianceReviewRecommendedCount: hrRecommended
+  };
+});
 
 module.exports = mongoose.model('Contract', contractSchema);

@@ -50,6 +50,7 @@ You must reply with valid JSON only, with this structure:
       "id": "clauseObjectId",
       "risk_level": "high",
       "risk_score": 8,
+      "confidence_score": 9,
       "risk_reasons": [
         "Restricts work in a very broad set of sectors for 24 months."
       ],
@@ -67,6 +68,7 @@ You must reply with valid JSON only, with this structure:
 
 - risk_level: one of "low", "medium", "high", "critical".
 - risk_score: integer from 1 to 10.
+- confidence_score: integer from 1 to 10. Use 9-10 for explicit statutory violations, 5-8 for inferred commercial risks, and 1-4 if the clause is highly ambiguous and requires human lawyer review.
 - risk_reasons: 1–5 short bullet-style strings.
 - possible_law_references: Use only when there is a clear connection to retrieved legal context or clause type. If mentioning a section, include the act_name. reason must be a short explanation in your own words. The act_key MUST match one of the keys provided in retrieved_legal_context.
 
@@ -349,16 +351,23 @@ async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
 
   const formattedBatch = clausesWithPrecedents.map((c) => {
     if (!globalContext) return c;
+
+    let dynamicConstraints = "";
+    if (globalContext.metadata?.documentType && globalContext.metadata.documentType.toLowerCase().includes('real estate')) {
+      dynamicConstraints = "\nCRITICAL: Because this is a Real Estate document, you are FORBIDDEN from citing the Indian Contract Act for property transfer mechanics. You MUST ground your reasoning in the Transfer of Property Act, 1882 or the Registration Act, 1908.\n";
+    }
+
     const globalPreamble = `
 ======================================================================
 [V3 CRITICAL ARCHITECTURAL RUNTIME CONTEXT - DO NOT BYPASS]
 The following parameters have been extracted from the root header of this document. 
 Utilize these explicit definitions to analyze the semantic intent of the active clause below.
 
+Document Type: ${globalContext.metadata?.documentType || "Not Explicitly Defined"}
 Governing Framework: ${globalContext.metadata?.governingLaw || "Not Explicitly Defined"}
 Corporate Employer: ${globalContext.metadata?.employerName || "Not Explicitly Defined"}
 Target Designation: ${globalContext.metadata?.employeeDesignation || "Not Explicitly Defined"}
-
+${dynamicConstraints}
 Global Definitions Mapping Matrix:
 ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
 ======================================================================

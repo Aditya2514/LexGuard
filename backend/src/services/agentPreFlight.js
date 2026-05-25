@@ -17,6 +17,7 @@ You must strictly output a valid JSON object matching the schema below. Do NOT a
 Required Schema:
 {
   "metadata": {
+    "documentType": "String (e.g., 'Employment Agreement', 'Real Estate Contract', 'Non-Disclosure Agreement')",
     "governingLaw": "String (e.g., 'Republic of India / State of Karnataka')",
     "employerName": "String",
     "employeeDesignation": "String",
@@ -68,6 +69,7 @@ async function runAgentPreFlight(rawText) {
     // Ensure safe structured defaults in case of incomplete/partial object returns
     return {
       metadata: {
+        documentType: resp?.metadata?.documentType || null,
         governingLaw: resp?.metadata?.governingLaw || null,
         employerName: resp?.metadata?.employerName || null,
         employeeDesignation: resp?.metadata?.employeeDesignation || null,
@@ -80,6 +82,7 @@ async function runAgentPreFlight(rawText) {
     console.error('⚠️  Pre-Flight LLM extraction failed. Returning safe defaults.', err.message);
     return {
       metadata: {
+        documentType: null,
         governingLaw: null,
         employerName: null,
         employeeDesignation: null,

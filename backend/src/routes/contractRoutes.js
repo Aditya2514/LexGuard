@@ -303,7 +303,7 @@ router.get(
 
     const [clauses, total] = await Promise.all([
       Clause.find({ contractId: req.params.id })
-        .select('_id segmentIndex rawText clause_type risk_level risk_score')
+        .select('_id segmentIndex rawText clause_type risk_level risk_score confidence_score')
         .sort({ segmentIndex: 1 })
         .skip(skip)
         .limit(limit),
@@ -339,7 +339,7 @@ router.get(
         .select(
           '_id segmentIndex rawText ' +
           'clause_type category_tags ' +
-          'risk_level risk_score risk_reasons possible_law_references ' +
+          'risk_level risk_score confidence_score risk_reasons possible_law_references ' +
           'plain_language_explanation worst_case_scenario negotiation_tip ' +
           'compliance_risk_level potential_issue_areas human_review_strongly_recommended explanatory_note'
         )

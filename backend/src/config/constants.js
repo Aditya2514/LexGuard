@@ -20,6 +20,9 @@ const CLAUSE_TYPES = [
   'amendment',
   'warranty',
   'force_majeure',
+  'disclosure',
+  'timeline_performance',
+  'delivery_possession',
   'other',
 ];
 

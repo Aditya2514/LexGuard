@@ -23,7 +23,8 @@ Allowed clause_type values (use exactly these strings):
 "non_compete", "non_solicitation", "intellectual_property", "licensing",
 "confidentiality", "privacy_data", "compensation", "termination",
 "liability_limit", "indemnification", "dispute_resolution", "governing_law", 
-"auto_renewal", "amendment", "warranty", "force_majeure", "other".
+"auto_renewal", "amendment", "warranty", "force_majeure", 
+"disclosure", "timeline_performance", "delivery_possession", "other".
 
 CRITICAL STRUCTURAL REQUIREMENT:
 You must classify the incoming contract text strictly into one of the following exact category enums. Do NOT deviate, capitalize differently, or use synonyms:
@@ -40,6 +41,9 @@ You must classify the incoming contract text strictly into one of the following 
 - "termination" (For termination for convenience, cause, notice periods, and Garden Leave provisions)
 - "amendment" (For clauses dealing with modifications, unilateral changes, or retroactive policies)
 - "auto_renewal" (For evergreen renewals or automatic term extensions)
+- "disclosure" (For real estate condition, latent defects, encumbrances)
+- "timeline_performance" (For time-is-of-the-essence, milestones, closing dates)
+- "delivery_possession" (For handing over of keys, clear title, vacating premises)
 - "other" (For general employment terms, active-term exclusivity, moonlighting, unpaid suspensions, or clauses that don't fit above)
 
 TRAP DETECTION WARNING: Look out for legal misdirection. If a clause starts like a standard non-disparagement or confidentiality clause, but the second half enforces massive financial penalties (e.g., "forfeiture of equity", "loss of unpaid bonuses", "liquidated damages"), you MUST classify it as "compensation". Financial pain ALWAYS supersedes the label of the clause.
