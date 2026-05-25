@@ -46,10 +46,23 @@ const contractSchema = new mongoose.Schema(
       enum: CONTRACT_CATEGORIES,
       required: [true, 'Contract category is required'],
     },
+    financial_obligations: [{
+      amount: { type: Number },
+      currency: { type: String, default: 'INR' },
+      description: { type: String },
+      clause_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Clause' }
+    }],
+    total_financial_exposure: { type: Number, default: 0 },
     rawText: {
       type: String,
       default: '',
     },
+    lifecycle_events: [{
+      event_type: String, // e.g., "RENEWAL", "EXPIRATION", "NOTICE_PERIOD"
+      date: Date,
+      description: String,
+      notified: { type: Boolean, default: false }
+    }],
     totalClauses: {
       type: Number,
       default: 0,

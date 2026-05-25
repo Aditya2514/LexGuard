@@ -399,6 +399,11 @@ router.post(
   })
 );
 
+// ── GET /api/contracts/:id/export-redline ──────────────────────────────────
+// Export automated negotiation redlines as a DOCX file.
+const { exportRedlineToDocx } = require('../controllers/exportController');
+router.get('/:id/export-redline', exportRedlineToDocx);
+
 // ── DELETE /api/contracts/:id ───────────────────────────────────────────────
 // Delete a contract and all its clauses.
 

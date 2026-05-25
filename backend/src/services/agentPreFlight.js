@@ -19,7 +19,9 @@ Required Schema:
   "metadata": {
     "governingLaw": "String (e.g., 'Republic of India / State of Karnataka')",
     "employerName": "String",
-    "employeeDesignation": "String"
+    "employeeDesignation": "String",
+    "employeeAddress": "String (The physical city/state/country of the employee)",
+    "companyAddress": "String (The physical city/state/country of the company)"
   },
   "globalDefinitions": {
     "ACTUAL_DEFINED_TERM_1": "Precise structural definition of ACTUAL_DEFINED_TERM_1 as written in the contract",
@@ -47,6 +49,8 @@ async function runAgentPreFlight(rawText) {
         governingLaw: null,
         employerName: null,
         employeeDesignation: null,
+        employeeAddress: null,
+        companyAddress: null,
       },
       globalDefinitions: {},
     };
@@ -67,6 +71,8 @@ async function runAgentPreFlight(rawText) {
         governingLaw: resp?.metadata?.governingLaw || null,
         employerName: resp?.metadata?.employerName || null,
         employeeDesignation: resp?.metadata?.employeeDesignation || null,
+        employeeAddress: resp?.metadata?.employeeAddress || null,
+        companyAddress: resp?.metadata?.companyAddress || null,
       },
       globalDefinitions: resp?.globalDefinitions || {},
     };
@@ -77,6 +83,8 @@ async function runAgentPreFlight(rawText) {
         governingLaw: null,
         employerName: null,
         employeeDesignation: null,
+        employeeAddress: null,
+        companyAddress: null,
       },
       globalDefinitions: {},
     };

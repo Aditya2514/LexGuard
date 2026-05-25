@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const caseLawSchema = new mongoose.Schema({
-  caseName: {
+  case_title: {
     type: String,
     required: true,
   },
@@ -9,7 +9,7 @@ const caseLawSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  court: {
+  legal_domain: {
     type: String,
     required: true,
   },
@@ -17,17 +17,13 @@ const caseLawSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  holdings: [{
-    type: String, // The core principles established by this case
-  }],
-  pineconeId: {
-    type: String,
-    unique: true,
-    required: true,
-  },
-  referenceUrl: {
-    type: String,
+  embedding: {
+    type: [Number], // 384-dimensional vector
+    default: [],
   }
 }, { timestamps: true });
+
+// Optional: create a basic text index for text searching if needed
+caseLawSchema.index({ case_title: 'text', summary: 'text' });
 
 module.exports = mongoose.model('CaseLaw', caseLawSchema);

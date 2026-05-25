@@ -1,0 +1,17 @@
+{
+  "California": {
+    "overrides": ["non_compete", "non_solicitation"],
+    "action": "force_critical",
+    "reason": "California Business and Professions Code Section 16600 voids post-employment non-competes regardless of the contract's stated governing law."
+  },
+  "India": {
+    "overrides": ["non_compete"],
+    "action": "force_critical",
+    "reason": "Section 27 of the Indian Contract Act voids post-employment non-competes, overriding foreign governing law clauses if executed locally."
+  },
+  "Washington": {
+    "overrides": ["non_compete"],
+    "action": "force_critical",
+    "reason": "Washington State law restricts non-competes for employees earning less than the mandated threshold, and strictly limits duration."
+  }
+}
