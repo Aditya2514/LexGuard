@@ -98,8 +98,9 @@ graph TB
 1. **Multi-Agent Architecture:** Each AI agent is a specialized, isolated module with its own system prompt, temperature setting, and output schema
 2. **Dual-Layer Defense:** LLM-based semantic analysis + Deterministic keyword traps (18 patterns)
 3. **Adversarial Verification:** Every risk assessment is cross-examined by a hostile "Judge" agent before being finalized
-4. **Graceful Degradation:** Redis → MongoDB fallback for queuing; LlamaParse → pdf-parse → Tesseract OCR fallback for parsing
-5. **RAG-Powered Compliance:** Real statutory text from 7,500+ ingested Indian law sections is injected into prompts
+4. **Serverless Resilience (GridFS & Redis):** Zero third-party upload dependencies. Uses Native Mongoose GridFS memory streaming to completely prevent BSONVersion mismatch errors and robust `rediss://` strict URL parsing for Upstash serverless caching.
+5. **Graceful Degradation:** Redis → MongoDB fallback for queuing; LlamaParse → pdf-parse → Tesseract OCR fallback for parsing
+6. **RAG-Powered Compliance:** Real statutory text from 7,500+ ingested Indian law sections is injected into prompts
 
 ---
 
@@ -118,7 +119,7 @@ graph TB
 | **Auth** | JWT (jsonwebtoken) + bcryptjs | Authentication & password hashing |
 | **Payments** | Razorpay SDK | Indian payment gateway |
 | **Security** | Helmet + express-rate-limit | HTTP hardening & DDoS protection |
-| **File Upload** | Multer | Multipart form data handling |
+| **File Upload** | Multer (Memory) + Native GridFS | Direct Multipart memory-to-database streaming (BSON mismatch safe) |
 
 ### Frontend
 | Component | Technology | Purpose |
@@ -647,9 +648,10 @@ journey
 
 ### Detailed Upload-to-Result Flow:
 1. **User** uploads a `.pdf` or `.docx` file with a selected category
-2. **Multer** validates file type, enforces 10MB limit
-3. **ParserService** extracts raw text (LlamaParse → pdf-parse → OCR fallback)
-4. **ClauseSplitter** breaks text into individual clause segments (pure heuristic)
+2. **Multer** validates file type, enforces 10MB limit, and **buffers to memory**
+3. **Native GridFS Pipeline** streams the buffer directly into the Mongoose connection without unstable third-party wrappers, guaranteeing 100% BSON version compatibility
+4. **ParserService** extracts raw text (LlamaParse → pdf-parse → OCR fallback)
+5. **ClauseSplitter** breaks text into individual clause segments (pure heuristic)
 5. **Contract** and **Clause** documents are persisted to MongoDB
 6. **JobQueueService** enqueues the contract (Redis LPUSH or MongoDB upsert)
 7. **Background Worker** picks up the job:

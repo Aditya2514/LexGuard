@@ -19,6 +19,7 @@ LexGuard is a full-stack, AI-powered legal contract intelligence platform built 
 - **Multi-Agent Pipeline:** Orchestrates 6 specialized LLM agents (Classifier, Risk Analyst, Adversarial Judge, Advocate, Compliance Checker, Chat) for high-fidelity analysis.
 - **Dual-Layer Defense:** LLM semantic analysis combined with an unbreakable **V6 Deterministic Safety Net** featuring 18 hard-coded legal trap tripwires.
 - **RAG-Powered Compliance:** Injects real statutory text (from 7,500+ ingested Indian bare acts) directly into the agent prompts.
+- **Serverless Resiliency:** Native memory-to-GridFS file streaming prevents BSON mismatch crashes on cloud platforms. Robust `rediss://` strict URL parsing ensures stable Upstash Redis connections.
 - **Contract Chat:** Ask interactive questions about any uploaded contract.
 - **Razorpay Integration:** Full freemium SaaS capabilities with usage quotas.
 
@@ -41,7 +42,7 @@ graph TB
     subgraph "Backend (Express.js)"
         API["REST API Layer"]
         Auth["JWT Auth Middleware"]
-        Upload["Multer File Upload"]
+        Upload["Multer (Memory)\n+ Native GridFS"]
         Queue["Dual-Mode Job Queue\n(Redis/Mongo)"]
     end
 
@@ -115,7 +116,7 @@ graph LR
 |:---|:---|
 | **Frontend** | React 18, Vite, Vanilla CSS, Axios |
 | **Backend** | Node.js, Express.js, JWT, Bcrypt |
-| **Database** | MongoDB Atlas, Mongoose |
+| **Database** | MongoDB Atlas, Mongoose (Native GridFS Streaming) |
 | **Caching / Queue** | Redis (with active MongoDB fallback polling) |
 | **AI Inference** | HuggingFace Inference API (`meta-llama`) |
 | **Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` |
