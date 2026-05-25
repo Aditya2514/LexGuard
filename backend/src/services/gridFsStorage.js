@@ -6,8 +6,8 @@ const { GridFsStorage } = require('multer-gridfs-storage');
 
 // Initialize GridFS storage engine for multer
 const storage = new GridFsStorage({
-  url: process.env.MONGODB_URI,
-  options: { useNewUrlParser: true, useUnifiedTopology: true },
+  url: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/dummy_lexguard_db',
+  options: { useNewUrlParser: true, useUnifiedTopology: true, serverSelectionTimeoutMS: 3000, connectTimeoutMS: 3000 },
   file: (req, file) => {
     return new Promise((resolve, reject) => {
       crypto.randomBytes(16, (err, buf) => {
