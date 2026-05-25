@@ -9,7 +9,10 @@ const { classifyClausesForContract } = require('./agent1ClauseExtractor');
 const { analyseRisksForContract } = require('./agent2RiskAnalyst');
 const { generateUserAdvocateForContract } = require('./agent3UserAdvocate');
 const { runComplianceCheckForContract } = require('./agent4ComplianceChecker');
+const { runAgent4FinancialAnalyst } = require('./agent4FinancialAnalyst');
+const { runAgent5LifecycleExtractor } = require('./agent5LifecycleExtractor');
 const { runAdversaryRedTeamForContract } = require('./agent6Adversary');
+const { enforceJurisdictionOverrides } = require('./jurisdictionOverrideService');
 const { dispatchWebhooks } = require('./webhookDispatcher');
 const pLimit = require('p-limit');
 
@@ -61,11 +64,15 @@ async function processContractJob(contractId) {
       })
     ]);
 
-    // 3. Run Agent 2 (Risk Analysis)
-    await updateJobProgress(contractId, 45, 'Analyzing risks and statutory touchpoints (Agent 2: Risk Analyst)');
-    await analyseRisksForContract(contractId);
+    // 3. Run Agent 2 (Risk Analysis), Financial Analyst, and Lifecycle Extractor concurrently
+    await updateJobProgress(contractId, 45, 'Analyzing risks and extracting metadata');
+    await Promise.all([
+      analyseRisksForContract(contractId),
+      runAgent4FinancialAnalyst(contractId),
+      runAgent5LifecycleExtractor(contractId)
+    ]);
 
-    // 4. Run Agent 3 & Agent 4 Concurrently
+    // 4. Run Agent 3 & Compliance Checker Concurrently
     await updateJobProgress(contractId, 70, 'Generating plain-language guides and checking Indian law');
     
     await Promise.all([
@@ -74,6 +81,9 @@ async function processContractJob(contractId) {
     ]);
 
     // 5. Finalize overall contract risk rating
+    await updateJobProgress(contractId, 85, 'Applying Zero-Trust multi-jurisdiction overrides');
+    await enforceJurisdictionOverrides(contractId);
+
     await updateJobProgress(contractId, 90, 'Computing final risk score and compiling dashboard');
     
     const analyzedClauses = await Clause.find({ contractId }).select('risk_level');

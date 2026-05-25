@@ -157,6 +157,34 @@ export default function ContractDetailPage() {
     );
   }
 
+  const handleExportRedlines = async () => {
+    try {
+      const BASE = import.meta.env.VITE_API_URL || '/api';
+      const token = localStorage.getItem('lexguard_token');
+      
+      // Need axios for blob downloading, or fetch
+      const res = await fetch(`${BASE}/contracts/${id}/export-redline`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Export failed');
+      }
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LexGuard_Redlines_${id}.docx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert(`Could not export redlines: ${err.message}`);
+    }
+  };
+
   const handleExportReport = async () => {
     try {
       const detailedData = await getClausesDetailed(id, 1, 1000);
@@ -595,6 +623,14 @@ export default function ContractDetailPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
         <Link to="/dashboard" className="btn btn-ghost" id="back-to-list">← All Contracts</Link>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleExportRedlines} 
+            disabled={isAnalyzing}
+            style={{ backgroundColor: '#059669', borderColor: '#047857' }}
+          >
+            📝 Export Redlines
+          </button>
           <button 
             className="btn btn-primary" 
             onClick={handleExportReport} 

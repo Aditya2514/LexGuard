@@ -5,6 +5,7 @@ const Contract = require('../models/Contract');
 const { RISK_LEVELS, AGENT_BATCH_SIZE } = require('../config/constants');
 const { LAW_REFERENCES } = require('../config/lawReferences');
 const { retrieveComplianceContext } = require('./lawRetrieverService');
+const { retrieveCaseLawPrecedents } = require('./ragCaseLawService');
 
 // ── System prompt ────────────────────────────────────────────────────────────
 
@@ -36,7 +37,9 @@ Your job is to highlight potential risks and pain points for a non-lawyer user, 
 
 ### 2. Input format
 
-You will receive a JSON object containing "clauses". Each clause may have a "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal content retrieved from our database. It may also have a "retrieved_contract_context" array containing text from other sections of the same contract that are semantically related. Use this contract context to resolve defined terms or cross-references across the document.
+You will receive a JSON object containing "clauses". Each clause may have a "retrieved_legal_context" array which contains official Indian Acts, section numbers, titles, and legal content retrieved from our database. 
+It may also contain a "retrieved_case_law" array containing exact legal precedents and Supreme Court rulings relevant to the clause. You MUST prioritize citing these specific case laws (e.g., "Under the precedent of Niranjan Shankar Golikari...") when formulating your risk reasoning, as they represent the actual applied law in India.
+It may also have a "retrieved_contract_context" array containing text from other sections of the same contract that are semantically related. Use this contract context to resolve defined terms or cross-references across the document.
 
 ### 3. Output format (JSON only)
 
@@ -335,7 +338,16 @@ async function triggerReflectionLoop(clauseObj, clauseText, globalContext) {
 }
 
 async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
-  const formattedBatch = clausesBatch.map((c) => {
+  // Retrieve case law precedents for each clause concurrently
+  const clausesWithPrecedents = await Promise.all(clausesBatch.map(async (c) => {
+    const precedents = await retrieveCaseLawPrecedents(c.text, 2, 0.4); // top 2 cases, min 0.4 similarity
+    return {
+      ...c,
+      retrieved_case_law: precedents.map(p => `CASE: ${p.case_title} | CITATION: ${p.citation} | PRECEDENT: ${p.summary}`)
+    };
+  }));
+
+  const formattedBatch = clausesWithPrecedents.map((c) => {
     if (!globalContext) return c;
     const globalPreamble = `
 ======================================================================

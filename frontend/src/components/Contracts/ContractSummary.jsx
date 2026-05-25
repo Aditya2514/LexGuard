@@ -1,4 +1,5 @@
 import RiskBadge from './RiskBadge';
+import FinancialExposureCard from './FinancialExposureCard';
 import './ContractSummary.css';
 
 export default function ContractSummary({ contract, riskSummary }) {
@@ -27,6 +28,12 @@ export default function ContractSummary({ contract, riskSummary }) {
         <RiskCount label="High" count={breakdown.high || 0} level="high" />
         <RiskCount label="Critical" count={breakdown.critical || 0} level="critical" />
       </div>
+
+      {/* Render Agent 4 Financial Obligations */}
+      <FinancialExposureCard 
+        financialObligations={contract?.financial_obligations || []} 
+        totalExposure={contract?.total_financial_exposure || 0} 
+      />
 
       {/* Compliance breakdown under Indian Law ( ICA, DPDP, Arbitration ) */}
       <div className="compliance-panel glass-panel">
