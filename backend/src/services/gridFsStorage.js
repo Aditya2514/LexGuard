@@ -35,15 +35,15 @@ mongoose.connection.once('open', () => {
 });
 
 /**
- * Returns a readable stream for a given GridFS file id or filename
- * @param {string} filename 
+ * Returns a readable stream for a given GridFS file id
+ * @param {ObjectId} fileId 
  * @returns {ReadableStream}
  */
-const getFileStream = (filename) => {
+const getFileStream = (fileId) => {
   if (!gfsBucket) {
     throw new Error('GridFSBucket is not initialized yet.');
   }
-  return gfsBucket.openDownloadStreamByName(filename);
+  return gfsBucket.openDownloadStream(fileId);
 };
 
 module.exports = {
