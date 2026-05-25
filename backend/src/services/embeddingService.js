@@ -3,6 +3,12 @@
  * Uses the lightweight and fast sentence-transformers/all-MiniLM-L6-v2 model.
  */
 
+const pLimit = require('p-limit');
+const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+
+// Max 5 concurrent embedding calls globally to prevent HTTP 429
+const embeddingLimiter = limitFn(5);
+
 async function generateEmbedding(text) {
   const apiKey = process.env.HUGGINGFACE_API_KEY;
   if (!apiKey) {
@@ -12,41 +18,43 @@ async function generateEmbedding(text) {
   const model = 'sentence-transformers/all-MiniLM-L6-v2';
   const url = `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`;
 
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          inputs: [text],
-          options: { wait_for_model: true }
-        })
-      });
+  return embeddingLimiter(async () => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            inputs: [text],
+            options: { wait_for_model: true }
+          })
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HF Embedding Error (${response.status}): ${errorText}`);
-      }
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HF Embedding Error (${response.status}): ${errorText}`);
+        }
 
-      const vectors = await response.json();
-      // The API returns an array of arrays (one vector per input). We sent one input.
-      if (Array.isArray(vectors) && vectors.length > 0 && Array.isArray(vectors[0])) {
-        return vectors[0]; // Return the 384-dimensional vector
-      }
+        const vectors = await response.json();
+        // The API returns an array of arrays (one vector per input). We sent one input.
+        if (Array.isArray(vectors) && vectors.length > 0 && Array.isArray(vectors[0])) {
+          return vectors[0]; // Return the 384-dimensional vector
+        }
 
-      throw new Error('Invalid response format from embedding model');
-    } catch (err) {
-      if (attempt < 3) {
-        console.warn(`⚠️ [EmbeddingService] Failed to generate embedding (attempt ${attempt}/3). Retrying in 2s...`);
-        await new Promise(res => setTimeout(res, 2000));
-        continue;
+        throw new Error('Invalid response format from embedding model');
+      } catch (err) {
+        if (attempt < 3) {
+          console.warn(`⚠️ [EmbeddingService] Failed to generate embedding (attempt ${attempt}/3). Retrying in 2s...`);
+          await new Promise(res => setTimeout(res, 2000));
+          continue;
+        }
+        throw err;
       }
-      throw err;
     }
-  }
+  });
 }
 
 /**
