@@ -476,6 +476,7 @@ graph TB
     <li><strong>Multi-Agent Architecture:</strong> Each AI agent is a specialized, isolated module with its own system prompt, temperature setting, and output schema</li>
     <li><strong>Dual-Layer Defense:</strong> LLM-based semantic analysis + Deterministic keyword traps (18 patterns)</li>
     <li><strong>Adversarial Verification:</strong> Every risk assessment is cross-examined by a hostile "Judge" agent before finalization</li>
+    <li><strong>Serverless Resilience (GridFS & Redis):</strong> Zero third-party upload dependencies. Uses Native Mongoose GridFS memory streaming to completely prevent BSONVersion mismatch errors and robust <code>rediss://</code> strict URL parsing for Upstash serverless caching.</li>
     <li><strong>Graceful Degradation:</strong> Redis → MongoDB fallback for queuing; LlamaParse → pdf-parse → Tesseract OCR fallback for parsing</li>
     <li><strong>RAG-Powered Compliance:</strong> Real statutory text from 7,500+ ingested Indian law sections is injected into prompts</li>
   </ul>
@@ -499,7 +500,7 @@ graph TB
       <tr><td>Auth</td><td>JWT + bcryptjs</td><td>Authentication & password hashing</td></tr>
       <tr><td>Payments</td><td>Razorpay SDK</td><td>Indian payment gateway</td></tr>
       <tr><td>Security</td><td>Helmet + express-rate-limit</td><td>HTTP hardening & DDoS protection</td></tr>
-      <tr><td>File Upload</td><td>Multer</td><td>Multipart form data handling</td></tr>
+      <tr><td>File Upload</td><td>Multer (Memory) + Native GridFS</td><td>Direct Multipart memory-to-database streaming (BSON mismatch safe)</td></tr>
     </tbody>
   </table>
 
@@ -864,7 +865,8 @@ journey
   <h3>Detailed Upload-to-Result Flow</h3>
   <ol>
     <li><strong>User</strong> uploads a <code>.pdf</code> or <code>.docx</code> file with a selected category</li>
-    <li><strong>Multer</strong> validates file type, enforces 10MB limit</li>
+    <li><strong>Multer</strong> validates file type, enforces 10MB limit, and <strong>buffers to memory</strong></li>
+    <li><strong>Native GridFS Pipeline</strong> streams the buffer directly into the Mongoose connection without unstable third-party wrappers, guaranteeing 100% BSON version compatibility</li>
     <li><strong>ParserService</strong> extracts raw text (LlamaParse → pdf-parse → OCR fallback)</li>
     <li><strong>ClauseSplitter</strong> breaks text into individual clause segments (pure heuristic)</li>
     <li><strong>Contract</strong> and <strong>Clause</strong> documents are persisted to MongoDB</li>
