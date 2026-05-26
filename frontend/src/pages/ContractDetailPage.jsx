@@ -7,6 +7,7 @@ import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
 import ContractChatSidebar from '../components/Contracts/ContractChatSidebar';
 import RedlineReview from '../components/Contracts/RedlineReview';
+import CrossRefAudit from '../components/Contracts/CrossRefAudit';
 
 export default function ContractDetailPage() {
   const { id } = useParams();
@@ -735,6 +736,22 @@ export default function ContractDetailPage() {
             >
               AI Remediation & Redlines
             </button>
+            <button 
+              onClick={() => setActiveTab('audit')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'audit' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'audit' ? '#3b82f6' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'audit' ? '600' : '400',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              Cross-Reference Audit
+            </button>
           </div>
 
           {activeTab === 'diagnostics' ? (
@@ -742,6 +759,8 @@ export default function ContractDetailPage() {
               <ContractSummary contract={contract} riskSummary={riskSummary} />
               <ClauseTable contractId={id} contractStatus={contract?.status} />
             </>
+          ) : activeTab === 'audit' ? (
+            <CrossRefAudit contract={contract} />
           ) : (
             <RedlineReview contractId={id} />
           )}

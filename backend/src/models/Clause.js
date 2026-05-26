@@ -9,6 +9,9 @@ const lawReferenceSchema = new mongoose.Schema(
     section_hint: { type: String },
     reason: { type: String },
     reference_url: { type: String },
+    // Citation Verification Layer fields
+    verification_status: { type: String, enum: ['verified', 'misquoted', 'not_found', 'unverifiable', 'not_applicable', null], default: null },
+    verification_note: { type: String, default: null },
   },
   { _id: false }
 );
@@ -63,6 +66,11 @@ const clauseSchema = new mongoose.Schema(
     risk_reasons: { type: [String], default: [] },
     possible_law_references: { type: [lawReferenceSchema], default: [] },
 
+    // ── Tier 2 Escalation (Senior Partner Review) ────────────────────────
+    tier2_escalated: { type: Boolean, default: false },
+    tier2_agrees: { type: Boolean, default: null },
+    tier2_senior_note: { type: String, default: null },
+
     // ── Phase 3: Agent 3 – User Advocate ─────────────────────────────────
     plain_language_explanation: { type: String, default: null },
     worst_case_scenario: { type: String, default: null },
@@ -88,6 +96,9 @@ const clauseSchema = new mongoose.Schema(
 
     // ── Phase 6: Agent 8 – The Drafter (Auto-Redlining) ──────────────────
     rewritten_text: { type: String, default: null },
+
+    // ── Citation Verification Layer ──────────────────────────────────────
+    citation_accuracy: { type: Number, min: 0, max: 100, default: null },
   },
   { timestamps: true }
 );

@@ -13,6 +13,17 @@ const agentMetadataSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const crossRefFindingSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ['undefined_term', 'broken_reference', 'circular_definition', 'conflict'] },
+    severity: { type: String, enum: ['low', 'medium', 'high'] },
+    issue_text: { type: String },
+    location_hint: { type: String },
+    recommendation: { type: String }
+  },
+  { _id: false }
+);
+
 const contractSchema = new mongoose.Schema(
   {
     userId: {
@@ -88,6 +99,10 @@ const contractSchema = new mongoose.Schema(
       type: agentMetadataSchema,
       default: () => ({}),
     },
+
+    // ── Phase 3: Agent 9 (Cross-Reference Auditor) ──────────────────────
+    crossRefFindings: { type: [crossRefFindingSchema], default: [] },
+    crossRefAuditSummary: { type: String, default: null },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

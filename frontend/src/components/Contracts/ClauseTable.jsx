@@ -342,14 +342,54 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
               {/* Law references */}
               {clause.possible_law_references?.length > 0 && (
                 <div className="expanded-section">
-                  <h4 className="expanded-label">📜 Indian Law References & Precedents</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h4 className="expanded-label">📜 Indian Law References & Precedents</h4>
+                    {clause.citation_accuracy != null && (
+                      <span style={{
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '600',
+                        background: clause.citation_accuracy >= 80 ? 'rgba(16,185,129,0.15)' : clause.citation_accuracy >= 50 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: clause.citation_accuracy >= 80 ? '#10b981' : clause.citation_accuracy >= 50 ? '#f59e0b' : '#ef4444',
+                      }}>
+                        Citation Accuracy: {clause.citation_accuracy}%
+                      </span>
+                    )}
+                  </div>
                   <div className="law-refs">
                     {clause.possible_law_references.map((ref, i) => {
                       const isPrecedent = ref.act_key === 'CASE_LAW';
+                      const vStatus = ref.verification_status;
+                      const verificationBadge = vStatus === 'verified'
+                        ? { icon: '✅', label: 'Verified', color: '#10b981' }
+                        : vStatus === 'misquoted'
+                        ? { icon: '⚠️', label: 'Misquoted', color: '#f59e0b' }
+                        : vStatus === 'not_found'
+                        ? { icon: '❌', label: 'Not Found', color: '#ef4444' }
+                        : vStatus === 'not_applicable'
+                        ? { icon: 'ℹ️', label: 'N/A', color: '#6b7280' }
+                        : null;
+
                       return (
                       <div className={`law-ref-card ${isPrecedent ? 'precedent-card' : ''}`} key={i}>
-                        <div className="law-ref-badge" style={{ marginBottom: '0.5rem', fontSize: '0.85rem', fontWeight: 'bold', color: isPrecedent ? '#9b59b6' : 'var(--accent-color)' }}>
-                           {isPrecedent ? '🏛️ Supreme Court Precedent' : '📜 Statutory Law'}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <div className="law-ref-badge" style={{ fontSize: '0.85rem', fontWeight: 'bold', color: isPrecedent ? '#9b59b6' : 'var(--accent-color)' }}>
+                             {isPrecedent ? '🏛️ Supreme Court Precedent' : '📜 Statutory Law'}
+                          </div>
+                          {verificationBadge && (
+                            <span title={ref.verification_note || ''} style={{
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '8px',
+                              fontSize: '0.7rem',
+                              fontWeight: '600',
+                              background: `${verificationBadge.color}18`,
+                              color: verificationBadge.color,
+                              cursor: 'help',
+                            }}>
+                              {verificationBadge.icon} {verificationBadge.label}
+                            </span>
+                          )}
                         </div>
                         <a
                           href={ref.reference_url}
@@ -364,6 +404,11 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                         )}
                         {ref.reason && (
                           <p className="law-ref-reason">{ref.reason}</p>
+                        )}
+                        {ref.verification_note && vStatus !== 'verified' && vStatus !== 'not_applicable' && (
+                          <p style={{ fontSize: '0.75rem', color: '#f59e0b', marginTop: '0.35rem', fontStyle: 'italic' }}>
+                            {ref.verification_note}
+                          </p>
                         )}
                       </div>
                     )})}
