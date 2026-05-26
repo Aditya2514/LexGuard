@@ -63,44 +63,50 @@ const extractText = async (fileId, originalName) => {
     } else if (ext === '.docx') {
       rawText = await parseDocx(tmpFilePath);
     }
+
+    // ── OCR Fallback for Scanned PDFs ─────────────────────────────────────────
+    if (ext === '.pdf' && (!rawText || rawText.trim().length < LOW_TEXT_DENSITY_THRESHOLD)) {
+      console.log(`⚠️  Low text density detected (${(rawText || '').trim().length} chars). Checking for OCR fallback...`);
+
+      const tesseractReady = await isTesseractAvailable();
+      if (tesseractReady) {
+        try {
+          console.log('📄 Scanned PDF detected. Initializing Tesseract OCR pipeline...');
+          rawText = await ocrFallbackForPdf(tmpFilePath);
+          console.log(`✅ OCR extraction complete. Recovered ${rawText.trim().length} characters.`);
+        } catch (ocrErr) {
+          console.error(`❌ OCR fallback failed: ${ocrErr.message}`);
+          throw new ApiError(
+            422,
+            'The uploaded PDF appears to be scanned/image-based. ' +
+              'OCR extraction was attempted but failed. Please upload a text-based PDF or DOCX file instead. ' +
+              `(${ocrErr.message})`
+          );
+        }
+      } else {
+        throw new ApiError(
+          422,
+          'Could not extract text from the uploaded PDF. The file appears to be scanned or image-based. ' +
+            'OCR processing is not available on this server. Please upload a text-based PDF or DOCX file instead.'
+        );
+      }
+    }
   } catch (parseErr) {
+    // Re-throw ApiError instances as-is; wrap unknown errors
+    if (parseErr instanceof ApiError) throw parseErr;
     throw new ApiError(
       422,
       `Could not parse the uploaded file. It may be corrupted, password-protected, or not a valid ${ext.toUpperCase()} file. (${parseErr.message})`
     );
-  }
-
-  // ── OCR Fallback for Scanned PDFs ─────────────────────────────────────────
-  if (ext === '.pdf' && (!rawText || rawText.trim().length < LOW_TEXT_DENSITY_THRESHOLD)) {
-    console.log(`⚠️  Low text density detected (${(rawText || '').trim().length} chars). Checking for OCR fallback...`);
-
-    const tesseractReady = await isTesseractAvailable();
-    if (tesseractReady) {
-      try {
-        console.log('📄 Scanned PDF detected. Initializing Tesseract OCR pipeline...');
-        rawText = await ocrFallbackForPdf(tmpFilePath);
-        console.log(`✅ OCR extraction complete. Recovered ${rawText.trim().length} characters.`);
-      } catch (ocrErr) {
-        console.error(`❌ OCR fallback failed: ${ocrErr.message}`);
-        throw new ApiError(
-          422,
-          'The uploaded PDF appears to be scanned/image-based. ' +
-            'OCR extraction was attempted but failed. Please upload a text-based PDF or DOCX file instead. ' +
-            `(${ocrErr.message})`
-        );
+  } finally {
+    // ALWAYS clean up the temp file — even on errors — to prevent disk leaks on serverless
+    try {
+      if (fs.existsSync(tmpFilePath)) {
+        fs.unlinkSync(tmpFilePath);
       }
-    } else {
-      throw new ApiError(
-        422,
-        'Could not extract text from the uploaded PDF. The file appears to be scanned or image-based. ' +
-          'OCR processing is not available on this server. Please upload a text-based PDF or DOCX file instead.'
-      );
+    } catch (_cleanupErr) {
+      // Swallow cleanup errors to avoid masking the original error
     }
-  }
-
-  // Cleanup temporary file to keep backend stateless
-  if (fs.existsSync(tmpFilePath)) {
-    fs.unlinkSync(tmpFilePath);
   }
 
   if (!rawText || rawText.trim().length === 0) {

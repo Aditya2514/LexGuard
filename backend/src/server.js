@@ -148,15 +148,15 @@ if (!process.env.VERCEL) {
     setInterval(async () => {
       try {
         const now = new Date();
-        const res = await User.updateMany(
+        const result = await User.updateMany(
           { quotaResetDate: { $lte: now } },
           { 
             usedThisMonth: 0, 
             quotaResetDate: new Date(now.getTime() + 30 * 86400000) 
           }
         );
-        if (res.modifiedCount > 0) {
-          console.log(`[Cron] Reset quotas for ${res.modifiedCount} users.`);
+        if (result.modifiedCount > 0) {
+          console.log(`[Cron] Reset quotas for ${result.modifiedCount} users.`);
         }
       } catch (err) {
         console.error('[Cron] Error resetting quotas:', err);

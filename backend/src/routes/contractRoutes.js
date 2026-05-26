@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 
 const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
@@ -223,37 +222,46 @@ router.get(
 
     res.write(`data: ${JSON.stringify({ status: contract.status, message: 'Connected' })}\n\n`);
 
-    // Initialize change stream on QueueJob collection
-    const changeStream = QueueJob.watch([], { fullDocument: 'updateLookup' });
+    // Use setInterval polling instead of Change Streams (M0 free tier doesn't support $changeStream)
+    let closed = false;
+    const pollInterval = setInterval(async () => {
+      if (closed) return;
+      try {
+        const qJob = await QueueJob.findOne({ contractId: req.params.id })
+          .select('status progress step error');
 
-    changeStream.on('change', async (change) => {
-      if (!change.fullDocument) return;
-      if (change.fullDocument.contractId.toString() !== req.params.id) return;
+        if (!qJob) return;
 
-      const qJob = change.fullDocument;
-      let cStatus = qJob.status === 'completed' ? 'done' : qJob.status;
-      
-      const payload = {
-        status: cStatus,
-        overallRiskLevel: null,
-        progress: qJob.progress,
-        step: qJob.step,
-      };
+        let cStatus = qJob.status === 'completed' ? 'done' : qJob.status;
 
-      if (cStatus === 'done' || cStatus === 'failed') {
-        const updatedContract = await Contract.findById(req.params.id);
-        payload.status = updatedContract.status;
-        payload.overallRiskLevel = updatedContract.overallRiskLevel;
-        res.write(`data: ${JSON.stringify(payload)}\n\n`);
-        changeStream.close();
-        res.end();
-      } else {
-        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        const payload = {
+          status: cStatus,
+          overallRiskLevel: null,
+          progress: qJob.progress,
+          step: qJob.step,
+        };
+
+        if (cStatus === 'done' || cStatus === 'failed') {
+          const updatedContract = await Contract.findById(req.params.id);
+          if (updatedContract) {
+            payload.status = updatedContract.status;
+            payload.overallRiskLevel = updatedContract.overallRiskLevel;
+          }
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+          clearInterval(pollInterval);
+          closed = true;
+          res.end();
+        } else {
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        }
+      } catch (pollErr) {
+        console.error('⚠️ SSE poll error:', pollErr.message);
       }
-    });
+    }, 2000);
 
     req.on('close', () => {
-      changeStream.close();
+      closed = true;
+      clearInterval(pollInterval);
     });
   })
 );
@@ -413,6 +421,20 @@ router.delete(
     const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
     if (!contract) throw new ApiError(404, 'Contract not found.');
 
+    // Clean up the GridFS binary file to prevent orphaned blobs
+    try {
+      const gfsBucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'uploads' });
+      const files = await mongoose.connection.db.collection('uploads.files')
+        .find({ filename: contract.fileName }).toArray();
+      for (const f of files) {
+        await gfsBucket.delete(f._id);
+      }
+    } catch (gridErr) {
+      console.warn('⚠️ GridFS cleanup failed (non-fatal):', gridErr.message);
+    }
+
+    // Clean up the QueueJob record
+    await QueueJob.deleteMany({ contractId: req.params.id });
     await Clause.deleteMany({ contractId: req.params.id });
     await Contract.findByIdAndDelete(req.params.id);
 

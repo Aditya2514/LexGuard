@@ -1,6 +1,7 @@
 const LegalDomainMap = require('../models/LegalDomainMap');
 const { generateEmbedding } = require('./embeddingService'); // Pre-existing service
 const mongoose = require('mongoose');
+const StatuteNode = require('../models/StatuteNode');
 
 /**
  * Dynamically retrieves relevant Indian Statutory Sections based on contract ontology and semantics
@@ -16,14 +17,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText) {
     // 2. Generate the 384-dimensional dense vector for the target clause wording
     const queryVector = await generateEmbedding(clauseText);
 
-    // 3. Connect directly to your Atlas Statutory Database collection (e.g., 'statutes')
-    const StatuteNode = mongoose.model('StatuteNode', new mongoose.Schema({
-      actName: String,
-      sectionNumber: String,
-      content: String,
-      domain: String,
-      embedding: [Number]
-    }), 'statutes');
+    // 3. Use the imported StatuteNode model (avoids OverwriteModelError on concurrent calls)
 
     // 4. Run native Atlas Vector Search with metadata domain filters
     const statutoryMatches = await StatuteNode.aggregate([

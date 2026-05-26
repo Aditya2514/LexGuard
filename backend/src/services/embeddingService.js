@@ -124,15 +124,21 @@ async function searchSimilarClauses(contractId, queryText, topK = 3) {
   const queryVector = await generateEmbedding(queryText);
   if (!queryVector) return [];
 
-  // Fetch all clauses for this contract that have embeddings
-  const clauses = await Clause.find({ contractId, embedding: { $ne: null } }).select('_id rawText embedding segmentIndex');
+  // Fetch all clauses for this contract that have valid non-empty embeddings
+  const clauses = await Clause.find({
+    contractId,
+    embedding: { $exists: true, $ne: null, $not: { $size: 0 } }
+  }).select('_id rawText embedding segmentIndex');
   
-  const scoredClauses = clauses.map(c => ({
-    clauseId: c._id,
-    segmentIndex: c.segmentIndex,
-    rawText: c.rawText,
-    score: cosineSimilarity(queryVector, c.embedding)
-  }));
+  const scoredClauses = clauses
+    .filter(c => Array.isArray(c.embedding) && c.embedding.length > 0) // In-memory safety net
+    .map(c => ({
+      clauseId: c._id,
+      segmentIndex: c.segmentIndex,
+      rawText: c.rawText,
+      score: cosineSimilarity(queryVector, c.embedding)
+    }))
+    .filter(c => !isNaN(c.score)); // Guard against NaN from degenerate vectors
 
   // Sort by highest similarity
   scoredClauses.sort((a, b) => b.score - a.score);

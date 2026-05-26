@@ -71,6 +71,10 @@ router.post('/verify', protect, asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Missing payment verification parameters.');
   }
 
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    throw new ApiError(503, 'Payment verification is not configured on the server.');
+  }
+
   const body = razorpay_order_id + "|" + razorpay_payment_id;
   const expectedSignature = crypto
     .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
