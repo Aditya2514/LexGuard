@@ -1,0 +1,212 @@
+.redline-review-container {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    color: var(--text-primary);
+}
+
+.redline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.redline-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.redline-title::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 1.25rem;
+    background: #3b82f6; /* Blue accent */
+    border-radius: 2px;
+}
+
+.redline-controls {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.clause-selector {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    min-width: 200px;
+}
+
+.toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+/* Switch styling */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+.switch input { 
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: var(--border-color);
+    transition: .4s;
+    border-radius: 20px;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+input:checked + .slider {
+    background-color: #3b82f6;
+}
+input:checked + .slider:before {
+    transform: translateX(16px);
+}
+
+.redline-content {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.redline-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-title {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.panel-title.ai {
+    color: #3b82f6;
+}
+
+.panel-box {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.25rem;
+    min-height: 150px;
+    line-height: 1.6;
+    font-size: 0.95rem;
+}
+
+.panel-box.ai-box {
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.redline-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
+.risk-level-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.risk-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.risk-value {
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.risk-value.high { color: #f59e0b; }
+.risk-value.critical { color: #ef4444; }
+
+.download-btn {
+    background: #333;
+    color: white;
+    border: 1px solid #444;
+    padding: 0.75rem 2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.download-btn:hover:not(:disabled) {
+    background: #444;
+}
+
+.download-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.diff-added {
+    color: #10b981;
+    font-weight: 600;
+    background: rgba(16, 185, 129, 0.1);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.diff-removed {
+    color: #ef4444;
+    text-decoration: line-through;
+    background: rgba(239, 68, 68, 0.1);
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px dashed rgba(16, 185, 129, 0.3);
+    border-radius: 8px;
+}

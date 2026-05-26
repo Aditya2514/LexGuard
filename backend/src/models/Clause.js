@@ -85,6 +85,9 @@ const clauseSchema = new mongoose.Schema(
     // ── Phase 5: Agent 6 – Adversary (Red-Teaming) ───────────────────────
     adversarial_warning: { type: String, default: null },
     hardened_rewrite: { type: String, default: null },
+
+    // ── Phase 6: Agent 8 – The Drafter (Auto-Redlining) ──────────────────
+    rewritten_text: { type: String, default: null },
   },
   { timestamps: true }
 );
