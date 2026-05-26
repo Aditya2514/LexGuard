@@ -58,7 +58,7 @@ Rules:
 {
   "results": [
     {
-      "id": "c1",
+      "id": 1,
       "clause_type": "non_compete",
       "category_tags": ["employment", "post_termination"]
     }
@@ -70,11 +70,13 @@ Rules:
 /**
  * Send a batch of clauses to the LLM for classification.
  *
- * @param {{ id: string, text: string }[]} clausesBatch
- * @returns {Promise<{ id: string, clause_type: string, category_tags: string[] }[]>}
+ * @param {{ id: number, text: string, originalId: string }[]} clausesBatch
+ * @returns {Promise<{ id: number, originalId: string, clause_type: string, category_tags: string[] }[]>}
  */
 async function runAgent1ClauseExtractor(clausesBatch) {
-  const userContent = JSON.stringify({ clauses: clausesBatch });
+  // Strip originalId from the payload sent to LLM to save tokens and prevent hex hallucinations
+  const payload = clausesBatch.map(c => ({ id: c.id, text: c.text }));
+  const userContent = JSON.stringify({ clauses: payload });
 
   const resp = await callLLM({
     systemPrompt: SYSTEM_PROMPT,
@@ -89,7 +91,7 @@ async function runAgent1ClauseExtractor(clausesBatch) {
   
   for (let i = 0; i < clausesBatch.length; i++) {
     const originalClause = clausesBatch[i];
-    let matched = rawResults.find(r => r && String(r.id) === String(originalClause.id));
+    let matched = rawResults.find(r => r && Number(r.id) === Number(originalClause.id));
     
     if (!matched && rawResults.length === clausesBatch.length) {
       matched = rawResults[i];
@@ -101,12 +103,14 @@ async function runAgent1ClauseExtractor(clausesBatch) {
     
     if (matched) {
       results.push({
+        originalId: originalClause.originalId,
         id: originalClause.id,
         clause_type: CLAUSE_TYPES.includes(matched.clause_type) ? matched.clause_type : 'other',
         category_tags: Array.isArray(matched.category_tags) ? matched.category_tags : [],
       });
     } else {
       results.push({
+        originalId: originalClause.originalId,
         id: originalClause.id,
         clause_type: 'other',
         category_tags: [],
@@ -130,13 +134,14 @@ async function classifyClausesForContract(contractId) {
   const clauses = await Clause.find({
     contractId,
     clause_type: null,
-  }).select('_id rawText');
+  }).select('_id rawText segmentIndex').sort({ segmentIndex: 1 });
 
   if (clauses.length === 0) return;
 
   // Build batch items
   const items = clauses.map((c) => ({
-    id: c._id.toString(),
+    originalId: c._id.toString(),
+    id: c.segmentIndex,
     text: c.rawText,
   }));
 
@@ -148,7 +153,7 @@ async function classifyClausesForContract(contractId) {
     // Build bulk writes
     const ops = results.map((r) => ({
       updateOne: {
-        filter: { _id: r.id },
+        filter: { _id: r.originalId },
         update: {
           $set: {
             clause_type: r.clause_type,

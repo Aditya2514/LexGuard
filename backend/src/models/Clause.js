@@ -48,6 +48,8 @@ const clauseSchema = new mongoose.Schema(
     category_tags: { type: [String], default: [] },
 
     // ── Phase 2: Agent 2 – Risk Analyst ──────────────────────────────────
+    has_commercial_asymmetry: { type: Boolean, default: null },
+    survives_termination: { type: Boolean, default: null },
     risk_level: {
       type: String,
       default: null,
