@@ -509,6 +509,7 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
       survives_termination: verifiedAnalysis.survives_termination !== undefined ? verifiedAnalysis.survives_termination : (baseAnalysis.survives_termination || false),
       risk_level: level,
       risk_score: score,
+      confidence_score: baseAnalysis.confidence_score || 5,
       risk_reasons: Array.isArray(risk_reasons) ? risk_reasons : [],
       possible_law_references: possible_law_references,
     };
@@ -636,7 +637,18 @@ async function analyseRisksForContract(contractId) {
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
       const task = async () => {
-        const results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
+        let results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
+        
+        // ── PHASE 2: Tier 2 Escalation (Senior Partner Review) ──
+        const { runTier2Escalation } = require('./tier2Escalation');
+        const clauseTextMap = {};
+        for (const item of batch) {
+           clauseTextMap[item.id] = item.text;
+        }
+        
+        // This will only re-process clauses that meet the escalation criteria
+        results = await runTier2Escalation(results, clauseTextMap);
+
         return results.map((r) => ({
           updateOne: {
             filter: { _id: r.originalId },
@@ -646,8 +658,15 @@ async function analyseRisksForContract(contractId) {
                 survives_termination: r.survives_termination,
                 risk_level: r.risk_level,
                 risk_score: r.risk_score,
+                confidence_score: r.confidence_score, // Now capturing confidence score
                 risk_reasons: r.risk_reasons,
                 possible_law_references: r.possible_law_references,
+                // These fields exist if Tier 2 processed the clause
+                ...(r.tier2_escalated ? {
+                    tier2_escalated: r.tier2_escalated,
+                    tier2_agrees: r.tier2_agrees,
+                    tier2_senior_note: r.tier2_senior_note,
+                } : {})
               },
             },
           },

@@ -72,17 +72,25 @@ async function processContractJob(contractId) {
       runAgent5LifecycleExtractor(contractId)
     ]);
 
-    // 4. Run Agent 3 & Compliance Checker Concurrently
-    await updateJobProgress(contractId, 70, 'Generating plain-language guides and checking Indian law');
+    // 4. Run Agent 3, Compliance Checker, and Agent 9 Concurrently
+    await updateJobProgress(contractId, 70, 'Generating plain-language guides, auditing cross-references, and checking Indian law');
     
+    const { runCrossRefAudit } = require('./agent9CrossRefAuditor');
+
     await Promise.all([
       generateUserAdvocateForContract(contractId),
-      runComplianceCheckForContract(contractId)
+      runComplianceCheckForContract(contractId),
+      runCrossRefAudit(contractId)
     ]);
 
     // 5. Finalize overall contract risk rating
     await updateJobProgress(contractId, 85, 'Applying Zero-Trust multi-jurisdiction overrides');
     await enforceJurisdictionOverrides(contractId);
+
+    // 5.5. Citation Verification Layer — verify all statute citations against the database
+    await updateJobProgress(contractId, 86, 'Verifying statute citations against legal database');
+    const { verifyCitationsForContract } = require('./citationVerifier');
+    await verifyCitationsForContract(contractId);
 
     // 6. Run Agent 8 (The Drafter) and generate the Redlined DOCX
     await updateJobProgress(contractId, 88, 'Agent 8 is auto-redlining predatory clauses');
