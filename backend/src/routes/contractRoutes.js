@@ -409,8 +409,12 @@ router.post(
 
 // ── GET /api/contracts/:id/export-redline ──────────────────────────────────
 // Export automated negotiation redlines as a DOCX file.
-const { exportRedlineToDocx } = require('../controllers/exportController');
+const { exportRedlineToDocx, downloadCleanedContract } = require('../controllers/exportController');
 router.get('/:id/export-redline', exportRedlineToDocx);
+
+// ── GET /api/contracts/:id/download-cleaned ──────────────────────────────────
+// Export the full stitched DOCX file with Agent 8 redlines.
+router.get('/:id/download-cleaned', downloadCleanedContract);
 
 // ── DELETE /api/contracts/:id ───────────────────────────────────────────────
 // Delete a contract and all its clauses.

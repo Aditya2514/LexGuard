@@ -6,6 +6,7 @@ import { getContract, getRiskSummary, getClausesDetailed } from '../api/lexguard
 import ContractSummary from '../components/Contracts/ContractSummary';
 import ClauseTable from '../components/Contracts/ClauseTable';
 import ContractChatSidebar from '../components/Contracts/ContractChatSidebar';
+import RedlineReview from '../components/Contracts/RedlineReview';
 
 export default function ContractDetailPage() {
   const { id } = useParams();
@@ -14,6 +15,9 @@ export default function ContractDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
+  // Tab State
+  const [activeTab, setActiveTab] = useState('diagnostics');
+
   // Joyride Tour State
   const [runTour, setRunTour] = useState(false);
 
@@ -697,8 +701,51 @@ export default function ContractDetailPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '1.5rem', alignItems: 'start' }}>
         <div id="pdf-export-content" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <ContractSummary contract={contract} riskSummary={riskSummary} />
-          <ClauseTable contractId={id} contractStatus={contract?.status} />
+          
+          <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+            <button 
+              onClick={() => setActiveTab('diagnostics')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'diagnostics' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'diagnostics' ? '#3b82f6' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'diagnostics' ? '600' : '400',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              Risk Diagnostics
+            </button>
+            <button 
+              onClick={() => setActiveTab('redlines')}
+              style={{
+                padding: '0.75rem 1.5rem',
+                background: 'none',
+                border: 'none',
+                borderBottom: activeTab === 'redlines' ? '2px solid #3b82f6' : '2px solid transparent',
+                color: activeTab === 'redlines' ? '#3b82f6' : 'var(--text-secondary)',
+                fontWeight: activeTab === 'redlines' ? '600' : '400',
+                cursor: 'pointer',
+                fontSize: '1rem',
+                transition: 'all 0.2s'
+              }}
+            >
+              AI Remediation & Redlines
+            </button>
+          </div>
+
+          {activeTab === 'diagnostics' ? (
+            <>
+              <ContractSummary contract={contract} riskSummary={riskSummary} />
+              <ClauseTable contractId={id} contractStatus={contract?.status} />
+            </>
+          ) : (
+            <RedlineReview contractId={id} />
+          )}
+
         </div>
         <div style={{ position: 'sticky', top: '1.5rem', height: 'calc(100vh - 3rem)' }}>
           <ContractChatSidebar contractId={id} />

@@ -84,6 +84,11 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 85, 'Applying Zero-Trust multi-jurisdiction overrides');
     await enforceJurisdictionOverrides(contractId);
 
+    // 6. Run Agent 8 (The Drafter) and generate the Redlined DOCX
+    await updateJobProgress(contractId, 88, 'Agent 8 is auto-redlining predatory clauses');
+    const { runAgent8DrafterForContract } = require('./agent8Drafter');
+    await runAgent8DrafterForContract(contractId);
+
     await updateJobProgress(contractId, 90, 'Computing final risk score and compiling dashboard');
     
     const analyzedClauses = await Clause.find({ contractId }).select('risk_level');

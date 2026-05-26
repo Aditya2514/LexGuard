@@ -131,6 +131,25 @@ const exportRedlineToDocx = asyncHandler(async (req, res) => {
     return res.status(200).send(buffer);
 });
 
+const { exportCleanedContract } = require('../services/documentExportService');
+
+const downloadCleanedContract = asyncHandler(async (req, res) => {
+    // 1. Fetch Contract to ensure it exists and belongs to the user
+    const contract = await Contract.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!contract) {
+        throw new ApiError(404, 'Contract not found or access denied.');
+    }
+
+    // 2. Generate the full stitched DOCX Buffer from Agent 8
+    const buffer = await exportCleanedContract(contract._id);
+
+    // 3. Send as a File Download
+    res.setHeader('Content-Disposition', `attachment; filename="LexGuard_Cleaned_${contract._id}.docx"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    return res.status(200).send(buffer);
+});
+
 module.exports = {
-    exportRedlineToDocx
+    exportRedlineToDocx,
+    downloadCleanedContract
 };
