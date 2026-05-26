@@ -9,37 +9,57 @@ const INC_STATUTORY_DATA_POOL = [
     actName: "Indian Contract Act, 1872",
     sectionNumber: "Section 27",
     domain: "general_contract_law",
+    jurisdiction: "Central",
     content: "Every agreement by which any one is restrained from exercising a lawful profession, trade or business of any kind, is to that extent void. Exception 1: One who sells the goodwill of a business may agree with the buyer to refrain from carrying on a similar business, within specified local limits."
   },
   {
     actName: "Digital Personal Data Protection Act, 2023",
     sectionNumber: "Section 6",
     domain: "data_privacy",
+    jurisdiction: "Central",
     content: "Consent given by the Data Principal shall be free, specific, informed, unconditional and unambiguous with a clear affirmative action, and shall signify agreement to the processing of her personal data for the specified purpose."
   },
   {
     actName: "Payment of Wages Act, 1936",
     sectionNumber: "Section 7",
     domain: "labor_law",
+    jurisdiction: "Central",
     content: "The wages of an employed person shall be paid to him without deductions of any kind except those authorized by or under this Act. Unreasonable fine retentions, unauthorized administrative structural deductions, or salary escrow drawdowns are strictly prohibited."
   },
   {
     actName: "Real Estate (Regulation and Development) Act, 2016",
     sectionNumber: "Section 18",
     domain: "real_estate_law",
+    jurisdiction: "Central",
     content: "If the promoter fails to complete or is unable to give possession of an apartment, plot or building, in accordance with the terms of the agreement for sale, he shall be liable to return the investment with interest at such rate as may be prescribed."
   },
   {
     actName: "Income Tax Act, 1961",
     sectionNumber: "Section 194C",
     domain: "taxation_law",
+    jurisdiction: "Central",
     content: "Any person responsible for paying any sum to any resident for carrying out any work in pursuance of a contract between the contractor and a specified person shall, at the time of credit of such sum to the account of the contractor or at the time of payment thereof in cash or by issue of a cheque or draft or by any other mode, whichever is earlier, deduct an amount equal to one per cent where the payment is being made or credit is being given to an individual or a Hindu undivided family, and two per cent where the payment is being made or credit is being given to a person other than an individual or a Hindu undivided family, of such sum as income-tax on income comprised therein."
   },
   {
     actName: "SEBI (Prohibition of Insider Trading) Regulations, 2015",
     sectionNumber: "Regulation 3",
     domain: "financial_securities_law",
+    jurisdiction: "Central",
     content: "No insider shall communicate, provide, or allow access to any unpublished price sensitive information, relating to a company or securities listed or proposed to be listed, to any person including other insiders except where such communication is in furtherance of legitimate purposes, performance of duties or discharge of legal obligations."
+  },
+  {
+    actName: "Karnataka Industrial Employment (Standing Orders) Rules, 1961",
+    sectionNumber: "Exemption Notification (IT/ITES)",
+    domain: "labor_law",
+    jurisdiction: "Karnataka",
+    content: "IT/ITES, Startups, Animation, Gaming, Computer Graphics, Telecom, BPO, KPO and other knowledge based industries are exempted from the applicability of the Industrial Employment (Standing Orders) Act, 1946 for a further period of five years, subject to the condition that the employers shall constitute internal committees to address sexual harassment and grievance redressal."
+  },
+  {
+    actName: "MahaRERA (Maharashtra Real Estate Regulatory Authority) Rules, 2017",
+    sectionNumber: "Rule 4",
+    domain: "real_estate_law",
+    jurisdiction: "Maharashtra",
+    content: "The promoter shall not accept a sum more than ten per cent of the cost of the apartment, plot, or building as the case may be, as an advance payment or an application fee, from a person without first entering into a written agreement for sale with such person and register the said agreement for sale."
   }
 ];
 
@@ -65,6 +85,7 @@ async function executeStatuteBulkIngestion() {
           sectionNumber: item.sectionNumber,
           content: item.content,
           domain: item.domain,
+          jurisdiction: item.jurisdiction,
           embedding: vector
         },
         { upsert: true, new: true }

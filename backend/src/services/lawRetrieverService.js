@@ -6,11 +6,11 @@ const StatuteNode = require('../models/StatuteNode');
 /**
  * Dynamically retrieves relevant Indian Statutory Sections based on contract ontology and semantics
  */
-async function retrieveComplianceContext(contractType, clauseType, clauseText) {
+async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central") {
   try {
     // 1. Fetch the exact statutory routing domains for this specific intersection
     const mapping = await LegalDomainMap.findOne({ contractType, clauseType });
-    const activeDomains = mapping ? mapping.targetDomains : ["general_contract_law"];
+    const activeDomains = mapping ? mapping.targetDomains : ["general_contract_law", "real_estate_law", "labor_law", "data_privacy"];
 
     console.log(`⚖️ [Ontology Router] Mapping [${contractType} ➔ ${clauseType}] to Domains:`, activeDomains);
 
@@ -28,7 +28,10 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText) {
           queryVector: queryVector,
           numCandidates: 30,
           limit: 3,
-          filter: { domain: { $in: activeDomains } } // Strict compliance scoping: zero contamination
+          filter: { 
+            domain: { $in: activeDomains },
+            jurisdiction: { $in: ["Central", jurisdiction] }
+          } // Strict compliance scoping: zero contamination, scoped to jurisdiction + Central
         }
       },
       {
@@ -42,7 +45,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText) {
       }
     ]);
 
-    const RELEVANCE_THRESHOLD = 0.82;
+    const RELEVANCE_THRESHOLD = 0.70;
     const relevantMatches = statutoryMatches.filter(match => match.similarityScore >= RELEVANCE_THRESHOLD);
 
     if (relevantMatches.length === 0) {

@@ -9,6 +9,12 @@ const statuteNodeSchema = new mongoose.Schema({
     required: true, 
     index: true 
   }, // Taxonomy bucket matching our LegalDomainMap (e.g., "data_privacy", "labor_law")
+  jurisdiction: {
+    type: String,
+    required: true,
+    default: "Central",
+    index: true
+  }, // e.g., "Central", "Maharashtra", "Karnataka"
   embedding: {
     type: [Number],
     required: true
