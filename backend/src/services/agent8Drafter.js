@@ -1,4 +1,4 @@
-const { generateText } = require('./aiClient');
+const { callLLM } = require('./aiClient');
 
 /**
  * Agent 8: The Drafter
@@ -24,17 +24,44 @@ Risk Level: ${riskAnalysis.risk_level}
 Explanation: ${riskAnalysis.explanation}
 Recommendation: ${riskAnalysis.recommendation}
 
+--- VERIFIED LEGAL CITATIONS ---
+${clause.possible_law_references && clause.possible_law_references.length > 0
+    ? clause.possible_law_references
+        .filter(ref => ref.verification_status === 'verified')
+        .map(ref => `- ${ref.verified_act_name || ref.act_name}, Section ${ref.verified_section || ref.section_hint}\n  Analysis: ${ref.reason}`)
+        .join('\n')
+    : 'No verified statutory citations provided. Rely on general fair commercial principles.'
+}
+
 --- TASK ---
 Rewrite the ORIGINAL CLAUSE above so that it perfectly resolves the issues highlighted by the Risk Analyst.
 - The new clause must sound professional and legally binding.
-- It must explicitly adopt the "Recommendation".
-- Output ONLY the rewritten clause text. Do not include introductory text like "Here is the rewritten clause:" or markdown blocks.`;
+- It must explicitly adopt the "Recommendation" and comply with any "Verified Legal Citations" provided.
+- You MUST output ONLY valid JSON in the following format:
+  {
+    "rewritten_text": "The fully rewritten clause text here"
+  }`;
 
     try {
-        const rewrittenText = await generateText(prompt, 'general');
-        return rewrittenText.trim();
+        const response = await callLLM({
+            systemPrompt: 'You are an expert Indian contract drafter. Always output valid JSON.',
+            userContent: prompt,
+            jsonMode: false,
+            temperature: 0.2, // Drafting requires precision
+            maxTokens: 1024,
+            providerOverride: 'gemini' // Explicitly force the more capable model for legal drafting
+        });
+        
+        let rewrittenText = '';
+        if (response && response.rewritten_text) {
+            rewrittenText = response.rewritten_text;
+        } else if (typeof response === 'object' && response.results) {
+            rewrittenText = response.results[0] || response.text || '';
+        }
+
+        return typeof rewrittenText === 'string' && rewrittenText.length > 0 ? rewrittenText.trim() : clause.text;
     } catch (err) {
-        console.error(`[Agent 8] Drafting failed for clause ${clause.clause_id}:`, err);
+        console.error(`[Agent 8] Drafting failed for clause ${clause.clause_id || clause._id}:`, err);
         return clause.text; // Fallback to original if drafting fails
     }
 }
