@@ -22,6 +22,44 @@ export default function RedlineReview({ contractId }) {
     const [selectedIdx, setSelectedIdx] = useState(0);
     const [inlineMode, setInlineMode] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
+    
+    // Feedback state
+    const [feedbackState, setFeedbackState] = useState({ status: 'idle', isRejecting: false, comment: '' });
+
+    // Reset feedback state when clause changes
+    useEffect(() => {
+        setFeedbackState({ status: 'idle', isRejecting: false, comment: '' });
+    }, [selectedIdx]);
+
+    const submitFeedback = async (approved) => {
+        try {
+            const BASE = import.meta.env.VITE_API_URL || '/api';
+            const token = localStorage.getItem('lexguard_token');
+            const payload = {
+                clauseId: currentClause._id,
+                contractId: contractId,
+                approved: approved,
+                userComment: feedbackState.comment,
+                originalText: currentClause.rawText,
+                rewrittenText: currentClause.rewritten_text
+            };
+
+            const res = await fetch(`${BASE}/feedback/rewrite`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                setFeedbackState({ ...feedbackState, status: 'submitted' });
+            }
+        } catch (err) {
+            console.error('Failed to submit feedback:', err);
+        }
+    };
 
     if (loading) {
         return (
@@ -151,6 +189,35 @@ export default function RedlineReview({ contractId }) {
                             {currentClause.rewritten_text}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Feedback UI */}
+            {feedbackState.status === 'submitted' ? (
+                <div className="feedback-success">
+                    ✅ Thank you for your feedback! This helps improve LexGuard's legal models.
+                </div>
+            ) : (
+                <div className="feedback-container">
+                    <p className="feedback-question">Is this rewrite legally sound and fair?</p>
+                    <div className="feedback-buttons">
+                        <button className="feedback-btn approve" onClick={() => submitFeedback(true)}>
+                            👍 Approve
+                        </button>
+                        <button className="feedback-btn reject" onClick={() => setFeedbackState({ ...feedbackState, isRejecting: !feedbackState.isRejecting })}>
+                            👎 Reject
+                        </button>
+                    </div>
+                    {feedbackState.isRejecting && (
+                        <div className="reject-comment-box">
+                            <textarea 
+                                placeholder="What's wrong with this rewrite? (Optional)"
+                                value={feedbackState.comment}
+                                onChange={(e) => setFeedbackState({ ...feedbackState, comment: e.target.value })}
+                            />
+                            <button className="submit-feedback-btn" onClick={() => submitFeedback(false)}>Submit Feedback</button>
+                        </div>
+                    )}
                 </div>
             )}
 

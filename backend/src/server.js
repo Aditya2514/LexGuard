@@ -6,6 +6,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const contractRoutes = require('./routes/contractRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const ApiError = require('./utils/ApiError');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -42,6 +43,7 @@ app.use(express.urlencoded({ extended: true, limit: '11mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 // Root landing endpoint to prevent 404 in Hugging Face Space iframe
 app.get('/', (_req, res) => {
