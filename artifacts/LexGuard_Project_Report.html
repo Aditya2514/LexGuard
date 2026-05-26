@@ -445,7 +445,7 @@ graph TB
         A1["Agent 1: Clause Extractor"]
         A2["Agent 2: Risk Analyst"]
         A25["Agent 2.5: Adversarial Judge"]
-        V6["V6 Deterministic Traps"]
+        V6["V8 Deterministic Traps"]
         A3["Agent 3: User Advocate"]
         A4["Agent 4: Compliance Checker"]
         A5["Agent 5: Contract Chat"]
@@ -474,11 +474,12 @@ graph TB
   <h3>Core Design Principles</h3>
   <ul>
     <li><strong>Multi-Agent Architecture:</strong> Each AI agent is a specialized, isolated module with its own system prompt, temperature setting, and output schema</li>
-    <li><strong>Dual-Layer Defense:</strong> LLM-based semantic analysis + Deterministic keyword traps (18 patterns)</li>
+    <li><strong>Dual-Layer Defense (V8):</strong> LLM Asymmetry analysis (Commercial intelligence) + Deterministic keyword traps (18 patterns)</li>
     <li><strong>Adversarial Verification:</strong> Every risk assessment is cross-examined by a hostile "Judge" agent before finalization</li>
     <li><strong>Serverless Resilience (GridFS & Redis):</strong> Zero third-party upload dependencies. Uses Native Mongoose GridFS memory streaming to completely prevent BSONVersion mismatch errors and robust <code>rediss://</code> strict URL parsing for Upstash serverless caching.</li>
+    <li><strong>Deterministic Mapping:</strong> Perfect data integrity via <code>segmentIndex</code> sorting instead of unpredictable MongoDB ObjectId string matching.</li>
     <li><strong>Graceful Degradation:</strong> Redis → MongoDB fallback for queuing; LlamaParse → pdf-parse → Tesseract OCR fallback for parsing</li>
-    <li><strong>RAG-Powered Compliance:</strong> Real statutory text from 7,500+ ingested Indian law sections is injected into prompts</li>
+    <li><strong>Vector Grounded Compliance:</strong> 384-dimensional database-native <code>$vectorSearch</code> with a rigid <code>0.82</code> threshold.</li>
   </ul>
 
   <div class="section-divider"></div>
@@ -650,14 +651,14 @@ graph LR
   <div class="section-divider"></div>
 
   <!-- ═══════════════════════ SECTION 6 ═══════════════════════ -->
-  <h2 class="page-break">6. Dual-Layer V6 Deterministic Safety Net</h2>
-  <p>The mathematically secure guardrail that runs AFTER the LLM and Judge. It uses pure keyword pattern matching (no AI) to catch predatory traps that LLMs consistently under-rate.</p>
+  <h2 class="page-break">6. V8 Asymmetry Engine & Deterministic Safety Net</h2>
+  <p>The mathematically secure guardrail that runs AFTER the LLM and Judge. It combines an advanced <strong>Asymmetry Engine</strong> with pure keyword pattern matching (no AI) to catch predatory traps that LLMs consistently under-rate.</p>
 
   <div class="diagram-container">
     <div class="mermaid">
 graph TD
-    LLM["LLM Agent 2 Risk Analysis"] --> Judge["Agent 2.5 Adversarial Judge"]
-    Judge --> SafetyNet{"V6 Deterministic Safety Net\n(18 Hardcoded Traps)"}
+    LLM["LLM Agent 2 Risk Analysis\n(Asymmetry Engine)"] --> Judge["Agent 2.5 Adversarial Judge"]
+    Judge --> SafetyNet{"V8 Deterministic Safety Net\n(18 Hardcoded Traps)"}
     SafetyNet -->|Match Found| Override["CRITICAL Override"]
     SafetyNet -->|No Match| Keep["Keep LLM Risk Level"]
     </div>
@@ -700,7 +701,8 @@ graph TD
   <p>The RAG (Retrieval-Augmented Generation) pipeline ensures Agent 4's compliance checks are grounded in <strong>real statutory text</strong>, not hallucinated legal knowledge:</p>
   <ol>
     <li><strong>Ontology Routing:</strong> <code>LegalDomainMap</code> maps <code>(contractType, clauseType)</code> → legal domains</li>
-    <li><strong>Dense Vector Search:</strong> Clause text is embedded using <code>all-MiniLM-L6-v2</code>, then searched against 7,556 pre-embedded statute nodes</li>
+    <li><strong>Vector Grounding:</strong> Clause text is embedded using <code>all-MiniLM-L6-v2</code>, then executed as a native <code>$vectorSearch</code> aggregation directly in MongoDB.</li>
+    <li><strong>Semantic Relevance Threshold:</strong> Results are strictly filtered through a <code>0.82</code> cosine similarity threshold.</li>
     <li><strong>Domain Filtering:</strong> Only statutes in the routed domains are returned (zero cross-contamination)</li>
     <li><strong>Prompt Injection:</strong> Top 3 matching statutory sections are injected into Agent 4's system prompt</li>
   </ol>
