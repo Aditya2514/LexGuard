@@ -36,11 +36,27 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText) {
           limit: 3,
           filter: { domain: { $in: activeDomains } } // Strict compliance scoping: zero contamination
         }
+      },
+      {
+        $project: {
+          actName: 1,
+          sectionNumber: 1,
+          content: 1,
+          domain: 1,
+          similarityScore: { $meta: "vectorSearchScore" }
+        }
       }
     ]);
 
+    const RELEVANCE_THRESHOLD = 0.82;
+    const relevantMatches = statutoryMatches.filter(match => match.similarityScore >= RELEVANCE_THRESHOLD);
+
+    if (relevantMatches.length === 0) {
+      return "No specific statutory framework mapped.";
+    }
+
     // 5. Format results into structured prompt blocks
-    return statutoryMatches.map(match => (
+    return relevantMatches.map(match => (
       `AUTHORITATIVE STATUTE: ${match.actName} - Section ${match.sectionNumber}\nStatutory Provision Text: ${match.content}\n[Domain Context: ${match.domain}]`
     )).join('\n\n');
 

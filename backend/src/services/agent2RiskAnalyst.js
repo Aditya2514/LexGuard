@@ -47,7 +47,9 @@ You must reply with valid JSON only, with this structure:
 {
   "results": [
     {
-      "id": "clauseObjectId",
+      "id": 1,
+      "has_commercial_asymmetry": true,
+      "survives_termination": true,
       "risk_level": "high",
       "risk_score": 8,
       "confidence_score": 9,
@@ -82,6 +84,14 @@ You must reply with valid JSON only, with this structure:
 - **SEMANTIC UNMASKING PROTOCOL (CRITICAL)**: You MUST ignore polite, formal, or "professional" corporate tone. Adversarial clauses often use words like "gesture of mutual commitment", "performance escrow", or "protect trade secrets" to disguise illegal wage theft or non-competes. Look strictly at the MATERIAL LEGAL EFFECT on the employee. If a clause results in forfeiture of assets, restricts future employment, or waives rights, it is HIGH/CRITICAL risk, regardless of how gently it is phrased.
 - Safe Harbor Validation Protocol: Before assigning a MEDIUM, HIGH, or CRITICAL risk rating to any clause, evaluate whether the contract text explicitly uses saving or protective qualifiers. If a clause explicitly guarantees compliance with statutory frameworks (e.g., "in absolute accordance with applicable local regulations", "conforming strictly with the state Shops and Establishments framework", "limited strictly to in-scope working hours", or "mutual consensus of both parties"), you MUST default to LOW risk (score 1-2) for that clause, unless an explicit contractual penalty, waiver, unconscionable indemnification, unilateral force majeure, or punitive mechanism is also present in the same clause text. The mere mention of a legal term (such as "Arbitration", "Confidentiality", "Intellectual Property", or "Non-Solicitation") must NOT trigger a risk elevation if the mechanism described is inherently mutual, consensual, time-limited to a reasonable period, or textually compliant with Indian default statutory protections. However, sweeping captures of pre-existing intellectual property, indemnifications covering gross negligence, or terminations without payment for work performed MUST be flagged as HIGH/CRITICAL.
 - **Precedent Prioritization Protocol**: If a Supreme Court or High Court Precedent (act_key: CASE_LAW) is provided in your retrieved_legal_context, you MUST prioritize its holdings over the raw statutory text of a Bare Act, as judicial precedent governs the application of the statute. explicitly cite the holding of the case when explaining your risk reasons.
+- **CRITICAL ANALYSIS: COMMERCIAL ASYMMETRY & LEVERAGE**: You must evaluate this clause for hidden economic or procedural abuse. A clause is ASYMMETRIC if it meets any of the following criteria:
+  1. Unilateral Discretion: One party can change terms, metrics, or schedules without the other's consent.
+  2. Procedural Capture: One party controls dispute resolution rules, venues, or arbitration selection.
+  3. Mathematical Variance Exploits: The clause allows for numerical variances (e.g., "measurements may vary by 18%") that disproportionately shield the drafter from financial liability.
+  Mandatory Action: If \`has_commercial_asymmetry\` is true, you MUST elevate the risk to HIGH or CRITICAL, even if the clause is technically "legal".
+- **CRITICAL ANALYSIS: SURVIVABILITY STACKING**: Scan the clause for terms like "survives termination", "perpetual", or "indefinitely".
+  Mandatory Action: If a severe obligation (like broad indemnity or data rights) survives indefinitely, you must flag \`survives_termination\` as true and elevate the risk level to HIGH.
+- **WARNING: DO NOT DEFAULT TO LOW RISK OUT OF UNCERTAINTY.** If a clause transfers massive commercial risk or creates perpetual obligations, it is dangerous. Do not output "No significant compliance issues flagged" if a commercial trap exists.
 `;
 
 // ── Allowed act_keys ─────────────────────────────────────────────────────────
@@ -375,7 +385,10 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
 [ACTIVE TARGET EVALUATION CLAUSE TEXT]:
 `;
     return {
-      ...c,
+      id: c.id,
+      clause_type: c.clause_type,
+      retrieved_legal_context: c.retrieved_legal_context,
+      retrieved_contract_context: c.retrieved_contract_context,
       text: globalPreamble + c.text
     };
   });
@@ -400,7 +413,7 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
   
   for (let i = 0; i < clausesBatch.length; i++) {
     const originalClause = clausesBatch[i];
-    let matched = rawResults.find(r => r && String(r.id) === String(originalClause.id));
+    let matched = rawResults.find(r => r && Number(r.id) === Number(originalClause.id));
     
     if (!matched && rawResults.length === clausesBatch.length) {
       matched = rawResults[i];
@@ -414,10 +427,12 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
       baseResults.push({
         ...matched,
         id: originalClause.id,
+        originalId: originalClause.originalId,
       });
     } else {
       baseResults.push({
         id: originalClause.id,
+        originalId: originalClause.originalId,
         risk_level: 'medium',
         risk_score: 5,
         risk_reasons: ['Base analyst did not return results for this clause.'],
@@ -442,7 +457,7 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     
     for (let i = 0; i < baseResults.length; i++) {
       const baseResult = baseResults[i];
-      let matched = rawJudgeResults.find(v => v && String(v.id) === String(baseResult.id));
+      let matched = rawJudgeResults.find(v => v && Number(v.id) === Number(baseResult.id));
       
       if (!matched && rawJudgeResults.length === baseResults.length) {
         matched = rawJudgeResults[i];
@@ -456,6 +471,7 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
         verifiedRiskyResults.push({
           ...matched,
           id: baseResult.id,
+          originalId: baseResult.originalId,
         });
       } else {
         verifiedRiskyResults.push(baseResult);
@@ -488,6 +504,9 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     
     let resultObj = {
       id: baseAnalysis.id,
+      originalId: baseAnalysis.originalId,
+      has_commercial_asymmetry: verifiedAnalysis.has_commercial_asymmetry !== undefined ? verifiedAnalysis.has_commercial_asymmetry : (baseAnalysis.has_commercial_asymmetry || false),
+      survives_termination: verifiedAnalysis.survives_termination !== undefined ? verifiedAnalysis.survives_termination : (baseAnalysis.survives_termination || false),
       risk_level: level,
       risk_score: score,
       risk_reasons: Array.isArray(risk_reasons) ? risk_reasons : [],
@@ -585,7 +604,7 @@ async function analyseRisksForContract(contractId) {
   const clauses = await Clause.find({
     contractId,
     risk_level: null,
-  }).select('_id rawText clause_type');
+  }).select('_id rawText clause_type segmentIndex').sort({ segmentIndex: 1 });
 
   if (clauses.length > 0) {
     const { searchSimilarClauses } = require('./embeddingService');
@@ -602,7 +621,8 @@ async function analyseRisksForContract(contractId) {
           .map(sc => `Clause ${sc.segmentIndex}: ${sc.rawText}`);
 
         return {
-          id: c._id.toString(),
+          originalId: c._id.toString(),
+          id: c.segmentIndex,
           text: c.rawText,
           clause_type: c.clause_type || 'other',
           retrieved_legal_context: retrieved,
@@ -619,9 +639,11 @@ async function analyseRisksForContract(contractId) {
         const results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
         return results.map((r) => ({
           updateOne: {
-            filter: { _id: r.id },
+            filter: { _id: r.originalId },
             update: {
               $set: {
+                has_commercial_asymmetry: r.has_commercial_asymmetry,
+                survives_termination: r.survives_termination,
                 risk_level: r.risk_level,
                 risk_score: r.risk_score,
                 risk_reasons: r.risk_reasons,
