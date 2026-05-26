@@ -25,7 +25,7 @@ const exportRedlineToDocx = asyncHandler(async (req, res) => {
     // 2. Filter clauses that actually need negotiation (High/Critical)
     const riskyClauses = clauses.filter(c => 
         (c.risk_level === 'high' || c.risk_level === 'critical') && 
-        c.advocate_rewrite
+        c.suggested_rewrite
     );
 
     // 3. Build DOCX Document
@@ -37,7 +37,7 @@ const exportRedlineToDocx = asyncHandler(async (req, res) => {
             spacing: { after: 400 }
         }),
         new Paragraph({
-            text: `Contract: ${contract.title || 'Untitled Document'}`,
+            text: `Contract: ${contract.originalFileName || 'Untitled Document'}`,
             heading: HeadingLevel.HEADING_2,
             spacing: { after: 200 }
         }),
@@ -108,7 +108,7 @@ const exportRedlineToDocx = asyncHandler(async (req, res) => {
                 spacing: { after: 100 }
             }));
             docChildren.push(new Paragraph({
-                text: clause.advocate_rewrite,
+                text: clause.suggested_rewrite,
                 color: "008000",
                 spacing: { after: 200 }
             }));
