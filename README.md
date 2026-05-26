@@ -17,8 +17,10 @@ LexGuard is a full-stack, AI-powered legal contract intelligence platform built 
 ## ⚡ Features
 - **Intelligent Parsing:** Supports PDF and DOCX files with a 3-tier fallback OCR strategy.
 - **Multi-Agent Pipeline:** Orchestrates 6 specialized LLM agents (Classifier, Risk Analyst, Adversarial Judge, Advocate, Compliance Checker, Chat) for high-fidelity analysis.
-- **Dual-Layer Defense:** LLM semantic analysis combined with an unbreakable **V6 Deterministic Safety Net** featuring 18 hard-coded legal trap tripwires.
-- **RAG-Powered Compliance:** Injects real statutory text (from 7,500+ ingested Indian bare acts) directly into the agent prompts.
+- **Asymmetry Engine:** Replaces standard keyword matching with an advanced commercial intelligence layer that detects unilateral jurisdiction, predatory equity clawbacks, and survivability exploitation.
+- **Vector Grounding (RAG):** Pushes 384-dimensional `$vectorSearch` calculations directly to the MongoDB Atlas layer, complete with a rigid `0.82` Semantic Relevance Threshold to permanently eliminate statutory hallucinations.
+- **Deterministic Synchronization:** Eliminates asynchronous data races by mapping clauses sequentially via exact index arrays, rather than relying on LLMs to echo cryptographic MongoDB string IDs.
+- **Dual-Layer Defense:** LLM semantic analysis combined with an unbreakable **V8 Deterministic Safety Net** featuring 18 hard-coded legal trap tripwires.
 - **Serverless Resiliency:** Native memory-to-GridFS file streaming prevents BSON mismatch crashes on cloud platforms. Robust `rediss://` strict URL parsing ensures stable Upstash Redis connections.
 - **Contract Chat:** Ask interactive questions about any uploaded contract.
 - **Razorpay Integration:** Full freemium SaaS capabilities with usage quotas.
@@ -69,14 +71,14 @@ graph TB
 
 ---
 
-## 🛡️ The Dual-Layer V6 Defense
+## 🛡️ The V8 Asymmetry Engine & Safety Net
 
-To prevent LLM hallucination and ensure absolute precision, LexGuard implements a mathematical safety net *after* the AI pipeline completes its risk analysis. The V6 layer uses strict keyword heuristics to catch 18 specific predatory traps.
+To prevent LLM hallucination and ensure absolute precision, LexGuard upgrades standard risk scoring with an **Asymmetry Engine** designed to catch enterprise-level commercial exploitation (unilateral discretion, procedural capture, mathematical variances). Additionally, it implements a mathematical safety net *after* the AI pipeline completes its risk analysis using strict keyword heuristics to catch specific predatory traps.
 
 ```mermaid
 graph TD
-    LLM["LLM Agent 2 Risk Analysis"] --> Judge["Agent 2.5 Adversarial Judge"]
-    Judge --> SafetyNet{"V6 Deterministic Safety Net\n(18 Hardcoded Traps)"}
+    LLM["LLM Agent 2 Risk Analysis\n(Asymmetry Engine)"] --> Judge["Agent 2.5 Adversarial Judge"]
+    Judge --> SafetyNet{"V8 Deterministic Safety Net\n(18 Hardcoded Traps)"}
     SafetyNet -->|Match Found| Override["CRITICAL Risk Override"]
     SafetyNet -->|No Match| Keep["Keep LLM Risk Level"]
 ```
