@@ -147,7 +147,7 @@ export default function ClauseTable({ contractId, contractStatus }) {
               <th>Risk</th>
               <th>Compliance</th>
               <th>Preview</th>
-              <th>Law Hints</th>
+              <th>Confidence</th>
             </tr>
           </thead>
           <tbody>
@@ -224,8 +224,8 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
         <td><RiskBadge riskLevel={clause.risk_level} confidenceScore={clause.confidence_score} /></td>
         <td><ComplianceBadge level={clause.compliance_risk_level || 'low'} /></td>
         <td className="clause-preview">{preview}</td>
-        <td className="law-count">
-          {lawCount > 0 ? `${lawCount} hint${lawCount > 1 ? 's' : ''}` : '—'}
+        <td className="confidence-cell">
+          <ConfidenceBadge score={clause.overall_confidence_score} level={clause.overall_confidence_level} />
         </td>
       </tr>
 
@@ -250,6 +250,25 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                 </div>
                 <p className="expanded-text">{clause.rawText}</p>
               </div>
+
+              {/* Confidence Breakdown */}
+              {clause.overall_confidence_level && (
+                <div className="expanded-section">
+                  <h4 className="expanded-label">🧠 AI Confidence Breakdown</h4>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                    <div style={{ background: 'var(--bg-lighter)', padding: '0.75rem', borderRadius: '8px', flex: 1, minWidth: '200px' }}>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Overall Score</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{clause.overall_confidence_score}/100</div>
+                      <div style={{ fontSize: '0.85rem', marginTop: '0.25rem' }}>{clause.overall_confidence_level} CONFIDENCE</div>
+                    </div>
+                    <div style={{ flex: 2, minWidth: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <p className="expanded-text" style={{ margin: 0, fontSize: '0.9rem' }}>
+                        This score is aggregated from Agent 2 self-reflection, Tier 2 Partner Escalation outcomes, strict Citation Verification, RAG retrieval quality, and Agent 9 cross-reference audits.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Indian law compliance section (Agent 4) */}
               <div className="expanded-section compliance-detail-section">
@@ -462,5 +481,41 @@ function ClauseTypeBadge({ type }) {
       <span style={{ fontSize: '1.1rem' }}>{icon}</span>
       <span>{label}</span>
     </div>
+  );
+}
+
+/* ── Confidence Badge Helper ─────────────────────────────────────────── */
+
+function ConfidenceBadge({ score, level }) {
+  if (!level) return <span className="badge" style={{ background: '#374151', color: '#9ca3af', border: '1px solid #4b5563' }}>N/A</span>;
+  
+  const colors = {
+    HIGH: { bg: 'rgba(16,185,129,0.15)', text: '#10b981', icon: '🟢', msg: 'LexGuard is confident in this assessment' },
+    MEDIUM: { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b', icon: '🟡', msg: 'Review recommended — some uncertainty' },
+    LOW: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', icon: '🔴', msg: 'Consult a lawyer — LexGuard is uncertain' },
+  };
+
+  const c = colors[level] || colors.MEDIUM;
+  return (
+    <span 
+      className="badge confidence-badge" 
+      title={`${c.msg} (Score: ${score}/100)`}
+      style={{
+        background: c.bg,
+        color: c.text,
+        cursor: 'help',
+        border: `1px solid ${c.text}40`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.25rem',
+        padding: '0.25rem 0.5rem',
+        borderRadius: '999px',
+        fontSize: '0.75rem',
+        fontWeight: 'bold',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      {c.icon} {level}
+    </span>
   );
 }

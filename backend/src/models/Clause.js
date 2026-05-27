@@ -99,6 +99,10 @@ const clauseSchema = new mongoose.Schema(
 
     // ── Citation Verification Layer ──────────────────────────────────────
     citation_accuracy: { type: Number, min: 0, max: 100, default: null },
+
+    // ── Phase 6: Confidence Scoring & Transparency ───────────────────────
+    overall_confidence_score: { type: Number, min: 0, max: 100, default: null },
+    overall_confidence_level: { type: String, enum: ['HIGH', 'MEDIUM', 'LOW', null], default: null },
   },
   { timestamps: true }
 );

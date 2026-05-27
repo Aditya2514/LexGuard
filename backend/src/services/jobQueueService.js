@@ -97,6 +97,11 @@ async function processContractJob(contractId) {
     const { runAgent8DrafterForContract } = require('./agent8Drafter');
     await runAgent8DrafterForContract(contractId);
 
+    // 7. Run Phase 6 (Confidence Scoring)
+    await updateJobProgress(contractId, 89, 'Computing transparency and confidence scores');
+    const { scoreConfidenceForContract } = require('./confidenceScorer');
+    await scoreConfidenceForContract(contractId);
+
     await updateJobProgress(contractId, 90, 'Computing final risk score and compiling dashboard');
     
     const analyzedClauses = await Clause.find({ contractId }).select('risk_level');
