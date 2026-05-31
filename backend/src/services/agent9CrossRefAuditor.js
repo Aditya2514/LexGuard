@@ -6,7 +6,7 @@
  * a major source of contract ambiguity and downstream legal risk.
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const callLLM = require('./aiClient');
 const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
 
@@ -53,53 +53,15 @@ async function runCrossRefAudit(contractId) {
         .map(c => `[Clause ${c.segmentIndex + 1}]\n${c.rawText}`)
         .join('\n\n');
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.warn('[Agent 9] GEMINI_API_KEY not set. Skipping audit.');
-        return;
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-        model: 'gemini-2.5-flash',
-        systemInstruction: AGENT9_SYSTEM_PROMPT,
-        generationConfig: {
-            temperature: 0.1,
-            responseMimeType: 'application/json',
-        }
-    });
-
     try {
         console.log(`[Agent 9] Running Cross-Reference Audit for contract ${contractId}...`);
         
-        let responseText = '';
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            try {
-                const result = await model.generateContent(`Analyze this contract:\n\n${fullTextWithMarkers}`);
-                responseText = result.response.text();
-                break; // Success
-            } catch (err) {
-                const errMessage = err.message || '';
-                const isTransient = errMessage.includes('503') || errMessage.includes('quota') || errMessage.includes('timeout') || errMessage.includes('429');
-                
-                if (attempt < 5 && isTransient) {
-                    let delayMs = attempt * 2000;
-                    
-                    // Intelligent Quota Wait: "Please retry in 39.2s"
-                    const retryMatch = errMessage.match(/retry in ([\d\.]+)s/i);
-                    if (retryMatch && retryMatch[1]) {
-                        delayMs = (parseFloat(retryMatch[1]) * 1000) + 1000; // Add 1s buffer
-                    }
-                    
-                    console.warn(`[Agent 9] Gemini transient error (attempt ${attempt}/5), retrying in ${Math.round(delayMs/1000)}s...`);
-                    await new Promise(r => setTimeout(r, delayMs));
-                } else {
-                    throw err; // Out of retries or non-transient
-                }
-            }
-        }
-        
-        const parsed = JSON.parse(responseText);
+        const parsed = await callLLM({
+            systemPrompt: AGENT9_SYSTEM_PROMPT,
+            userContent: `Analyze this contract:\n\n${fullTextWithMarkers}`,
+            jsonMode: true,
+            temperature: 0.1
+        });
 
         // Save findings to the Contract model
         await Contract.findByIdAndUpdate(contractId, {

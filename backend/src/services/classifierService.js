@@ -19,6 +19,47 @@
  * @param {string} text - The clause text to analyze
  * @returns {{ type: string, severity: 'critical' | 'high' }[]} Detected traps
  */
+const callLLM = require('./aiClient');
+
+const SEMANTIC_TRAP_PROMPT = `You are a semantic trap detector (Agent 4) auditing an Indian contract clause.
+Analyze the text for hidden predatory traps that do not explicitly use obvious keywords but have the same material effect (e.g., disguised non-competes, backdoor wage theft, unconscionable unilateral variance exploits).
+Return JSON only:
+{
+  "has_semantic_trap": true/false,
+  "trap_type": "disguised_wage_theft | disguised_non_compete | backdoor_penalty",
+  "severity": "high" | "critical",
+  "reasoning": "Explanation of the hidden trap's material legal effect."
+}`;
+
+async function detectSemanticTraps(text) {
+    if (!text || text.length < 50) return [];
+    
+    if (process.env.ENABLE_SEMANTIC_TRAP_DETECTION !== 'true') {
+        return [];
+    }
+
+    try {
+        const resp = await callLLM({
+            systemPrompt: SEMANTIC_TRAP_PROMPT,
+            userContent: JSON.stringify({ clause_text: text }),
+            jsonMode: true,
+            temperature: 0.1,
+            maxTokens: 512
+        });
+
+        if (resp && resp.has_semantic_trap) {
+            return [{
+                type: resp.trap_type || 'semantic_trap',
+                severity: resp.severity || 'high',
+                reasoning: resp.reasoning || 'Hidden predatory intent detected via semantic analysis.'
+            }];
+        }
+    } catch (e) {
+        console.warn('⚠️ [Semantic Trap Detector] Failed:', e.message);
+    }
+    return [];
+}
+
 function detectPredatoryTraps(text) {
     if (!text || text.length < 50) return [];
     
@@ -417,5 +458,5 @@ function detectPredatoryTraps(text) {
     return detectedTraps;
 }
 
-module.exports = { detectPredatoryTraps };
+module.exports = { detectPredatoryTraps, detectSemanticTraps };
 

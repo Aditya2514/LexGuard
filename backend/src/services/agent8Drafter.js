@@ -46,7 +46,7 @@ Rewrite the ORIGINAL CLAUSE above so that it perfectly resolves the issues highl
         const response = await callLLM({
             systemPrompt: 'You are an expert Indian contract drafter. Always output valid JSON.',
             userContent: prompt,
-            jsonMode: false,
+            jsonMode: true,
             temperature: 0.2, // Drafting requires precision
             maxTokens: 1024,
             providerOverride: 'gemini' // Explicitly force the more capable model for legal drafting

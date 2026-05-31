@@ -17,7 +17,7 @@ async function enforceJurisdictionOverrides(contractId) {
         if (!employeeAddress && !companyAddress) return; // Nothing to check against
 
         // Search the employee or company address against our rulebook keys
-        let matchedRuleKey = null;
+        const matchedRuleKeys = [];
         for (const jurisdictionKey of Object.keys(jurisdictionRules)) {
             // Check if the jurisdiction keyword exists in the extracted addresses
             const regex = new RegExp(`\\b${jurisdictionKey}\\b`, 'i');
@@ -25,45 +25,46 @@ async function enforceJurisdictionOverrides(contractId) {
                 (employeeAddress && regex.test(employeeAddress)) || 
                 (companyAddress && regex.test(companyAddress))
             ) {
-                matchedRuleKey = jurisdictionKey;
-                break;
+                matchedRuleKeys.push(jurisdictionKey);
             }
         }
 
-        if (!matchedRuleKey) return; // No override rules for this location
+        if (matchedRuleKeys.length === 0) return; // No override rules for this location
 
-        const rule = jurisdictionRules[matchedRuleKey];
-        
-        // Fetch all clauses that match the target override types
-        const clausesToOverride = await Clause.find({
-            contractId,
-            clause_type: { $in: rule.overrides }
-        });
+        for (const matchedRuleKey of matchedRuleKeys) {
+            const rule = jurisdictionRules[matchedRuleKey];
+            
+            // Fetch all clauses that match the target override types
+            const clausesToOverride = await Clause.find({
+                contractId,
+                clause_type: { $in: rule.overrides }
+            });
 
-        if (clausesToOverride.length === 0) return;
+            if (clausesToOverride.length === 0) continue;
 
-        console.log(`🛡️ [Zero-Trust] Detected ${matchedRuleKey} jurisdiction! Enforcing statutory overrides on ${clausesToOverride.length} clauses.`);
+            console.log(`🛡️ [Zero-Trust] Detected ${matchedRuleKey} jurisdiction! Enforcing statutory overrides on ${clausesToOverride.length} clauses.`);
 
-        for (const clause of clausesToOverride) {
-            // Apply the deterministic override
-            let targetScore = clause.risk_score;
-            if (rule.action === 'force_critical') {
-                targetScore = 9;
-                
-                // Only mutate if the LLM didn't already rate it critical
-                if (clause.risk_level !== 'critical') {
-                    clause.risk_level = 'critical';
-                    clause.risk_score = targetScore;
+            for (const clause of clausesToOverride) {
+                // Apply the deterministic override
+                let targetScore = clause.risk_score;
+                if (rule.action === 'force_critical') {
+                    targetScore = 9;
                     
-                    const overrideReason = `🚨 [Zero-Trust Statutory Override] ${rule.reason}`;
-                    
-                    if (clause.risk_reasons) {
-                        clause.risk_reasons = [overrideReason, ...clause.risk_reasons];
-                    } else {
-                        clause.risk_reasons = [overrideReason];
+                    // Only mutate if the LLM didn't already rate it critical
+                    if (clause.risk_level !== 'critical') {
+                        clause.risk_level = 'critical';
+                        clause.risk_score = targetScore;
+                        
+                        const overrideReason = `🚨 [Conflict of Law - State vs Central] ${rule.reason}`;
+                        
+                        if (clause.risk_reasons) {
+                            clause.risk_reasons = [overrideReason, ...clause.risk_reasons];
+                        } else {
+                            clause.risk_reasons = [overrideReason];
+                        }
+                        
+                        await clause.save();
                     }
-                    
-                    await clause.save();
                 }
             }
         }

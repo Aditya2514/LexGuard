@@ -9,6 +9,7 @@ const { AI_MODEL_NAME } = require('../config/constants');
 const pLimit = require('p-limit');
 // Some versions of p-limit export default
 const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+const SystemMetric = require('../models/SystemMetric');
 
 // Max 5 concurrent LLM calls globally across all agents to prevent HTTP 429
 const globalLlmLimiter = limitFn(5);
@@ -140,7 +141,8 @@ async function callGrok({
     throw new Error('Grok returned an empty response.');
   }
 
-  return extractJSON(rawText);
+  const totalTokens = data?.usage?.total_tokens || 0;
+  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
 }
 
 // ── Hugging Face Serverless Client ──────────────────────────────────────────
@@ -217,7 +219,8 @@ async function callHuggingFace({
         throw new Error('Hugging Face returned an empty response.');
       }
 
-      return extractJSON(rawText);
+      const totalTokens = data?.usage?.total_tokens || 0;
+      return { parsed: extractJSON(rawText), tokens: totalTokens, model };
     } catch (err) {
       lastErr = err;
       const isNetwork = err.message.includes('fetch failed') || err.message.includes('EAI_AGAIN') || err.message.includes('ENOTFOUND');
@@ -287,7 +290,8 @@ async function callGroq({
     throw new Error('Groq returned an empty response.');
   }
 
-  return extractJSON(rawText);
+  const totalTokens = data?.usage?.total_tokens || 0;
+  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -402,7 +406,8 @@ async function callLLM({
             throw new Error('LLM returned an empty response — no text content found.');
           }
 
-          return extractJSON(text);
+          const totalTokens = result.response.usageMetadata?.totalTokenCount || 0;
+          return { parsed: extractJSON(text), tokens: totalTokens, model: activeModel };
         } catch (err) {
           const isQuota = (err.message || '').toLowerCase().includes('quota');
           if (attempt < 2 && isTransient(err)) {
@@ -442,11 +447,26 @@ async function callLLM({
     for (const p of activeProviders) {
       try {
         console.log(`[aiClient] Calling LLM via provider: ${p.name} (Global Concurrency Locked)`);
+        const startTime = Date.now();
         const res = await p.fn();
-        return res;
+        const latency = Date.now() - startTime;
+        
+        SystemMetric.create([
+          { metricType: 'LLM_LATENCY', provider: p.name, value: latency, metadata: { model: res.model } },
+          { metricType: 'API_TOKEN_USAGE', provider: p.name, value: res.tokens || 0, metadata: { model: res.model } }
+        ]).catch(err => {
+          console.warn('⚠️ Telemetry drop (non-fatal):', err.message);
+        });
+
+        return res.parsed;
       } catch (err) {
         console.warn(`⚠️ [aiClient] Provider ${p.name} failed: ${err.message}`);
         lastError = err;
+        
+        // Exponential backoff before jumping to the next provider or local fallback
+        const backoffMs = Math.pow(2, activeProviders.indexOf(p) + 1) * 2000;
+        console.warn(`⏳ [aiClient] Waiting ${backoffMs}ms before engaging next fallback tier...`);
+        await new Promise(r => setTimeout(r, backoffMs));
       }
     }
 

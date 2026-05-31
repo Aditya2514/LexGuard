@@ -56,6 +56,7 @@ You must reply with valid JSON only, with this structure:
       "risk_reasons": [
         "Restricts work in a very broad set of sectors for 24 months."
       ],
+      "depends_on_clause_ids": [2],
       "possible_law_references": [
         {
           "act_key": "INDIAN_CONTRACT_ACT",
@@ -72,6 +73,7 @@ You must reply with valid JSON only, with this structure:
 - risk_score: integer from 1 to 10.
 - confidence_score: integer from 1 to 10. Use 9-10 for explicit statutory violations, 5-8 for inferred commercial risks, and 1-4 if the clause is highly ambiguous and requires human lawyer review.
 - risk_reasons: 1–5 short bullet-style strings.
+- depends_on_clause_ids: An array of integers representing the IDs of other clauses in the same document that this clause references or semantically depends on (e.g. cross-references, definitions).
 - possible_law_references: Use only when there is a clear connection to retrieved legal context or clause type. If mentioning a section, include the act_name. reason must be a short explanation in your own words. The act_key MUST match one of the keys provided in retrieved_legal_context.
 
 ### 4. Special handling rules
@@ -441,8 +443,10 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     }
   }
   
-  // Adversarial Judge: run judge on all clauses to catch both False Positives and False Negatives
-  const riskyResults = baseResults;
+  // Adversarial Judge: run judge on risky clauses to catch False Negatives and False Positives
+  const riskyResults = baseResults.filter(r =>
+    r.risk_level === 'medium' || r.risk_level === 'high' || r.risk_level === 'critical'
+  );
   
   let verifiedRiskyResults = [];
   if (riskyResults.length > 0) {
@@ -523,6 +527,22 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     // V6 Predatory Trap Escalation (deterministic safety net)
     const previousScore = resultObj.risk_score;
     resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
+
+    // Phase 4A: Semantic Trap Detection (Gated)
+    if (process.env.ENABLE_SEMANTIC_TRAP_DETECTION === 'true' && resultObj.risk_level !== 'critical') {
+        const { detectSemanticTraps } = require('./classifierService');
+        const semanticTraps = await detectSemanticTraps(clauseTextMap[baseAnalysis.id] || "");
+        if (semanticTraps.length > 0) {
+             const trap = semanticTraps[0];
+             resultObj.risk_level = trap.severity === 'critical' ? 'critical' : 'high';
+             resultObj.risk_score = trap.severity === 'critical' ? 9 : 8;
+             resultObj.risk_reasons = [
+                 `🧠 [Semantic AI Override] Detected hidden trap: ${trap.type}. ${trap.reasoning}`,
+                 ...(resultObj.risk_reasons || [])
+             ];
+             console.log(`🛡️ [Semantic Guardrail Triggered] Clause ${resultObj.id}: Overriding to ${resultObj.risk_level}.`);
+        }
+    }
 
     // Phase 1: Selective Reflection Loop (Self-Healing)
     if (resultObj.risk_score > previousScore) {

@@ -1,5 +1,5 @@
 /** Minimum length (chars) for a segment to be kept as an independent clause. */
-const MIN_CLAUSE_LENGTH = 30;
+const MIN_CLAUSE_LENGTH = 80;
 
 /**
  * Detects if a line looks like a section heading.
@@ -21,6 +21,23 @@ const isHeading = (text) => {
   }
   return false;
 };
+
+/**
+ * Detects if the current segment is logically a continuation of the previous segment.
+ */
+function isContinuation(prev, current) {
+    const trimmedPrev = prev.trimEnd();
+    const trimmedCurrent = current.trimStart();
+    // Continuation if previous ends with colon, comma, or semicolon
+    if (/[,:;]$/.test(trimmedPrev)) return true;
+    // Continuation if current starts with lowercase letter
+    if (/^[a-z]/.test(trimmedCurrent)) return true;
+    // Continuation if current starts with sub-item markers that are children
+    if (/^\([a-z]\)|\([ivx]+\)/i.test(trimmedCurrent) && !isHeading(trimmedCurrent)) return true;
+    // Continuation if current is very short (< 80 chars) and not a heading
+    if (trimmedCurrent.length < 80 && !isHeading(trimmedCurrent)) return true;
+    return false;
+}
 
 /**
  * Heuristic-based contract clause splitter. Uses only code — no AI.
@@ -54,11 +71,14 @@ const splitClauses = (cleanedText) => {
     });
   }
 
-  // Step 3: Merge orphan short segments into the previous clause
+  // Step 3: Merge orphan short segments and logical continuations into the previous clause
   const merged = [];
   for (const seg of segments) {
-    if (merged.length > 0 && seg.length < MIN_CLAUSE_LENGTH && !isHeading(seg)) {
-      merged[merged.length - 1] += ' ' + seg;
+    const prevSeg = merged[merged.length - 1];
+    if (prevSeg && isContinuation(prevSeg, seg)) {
+      merged[merged.length - 1] += '\n' + seg;
+    } else if (merged.length > 0 && seg.length < MIN_CLAUSE_LENGTH && !isHeading(seg)) {
+      merged[merged.length - 1] += '\n' + seg;
     } else {
       merged.push(seg);
     }

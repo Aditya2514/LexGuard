@@ -10,7 +10,8 @@ import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 import RefundPage from './pages/RefundPage';
 import ContactPage from './pages/ContactPage';
-
+import AdminDashboard from './pages/AdminDashboard';
+import AdminRoute from './components/Auth/AdminRoute';
 export default function App() {
   return (
     <BrowserRouter>
@@ -31,6 +32,11 @@ export default function App() {
           <Route path="/dashboard" element={<ContractsPage />} />
           <Route path="/contracts/:id" element={<ContractDetailPage />} />
           <Route path="/pricing" element={<PricingPage />} />
+          
+          {/* Admin Routes */}
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

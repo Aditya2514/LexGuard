@@ -12,7 +12,7 @@
  *   - risk_level is 'high' or 'critical'
  */
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const callLLM = require('./aiClient');
 
 // ── Tier 2 System Prompt ─────────────────────────────────────────────────────
 
@@ -96,14 +96,6 @@ async function runTier2Escalation(clauseResults, clauseTextMap) {
 
     console.log(`[Tier 2] Escalating ${escalationCandidates.length}/${clauseResults.length} clauses for senior review.`);
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.warn('[Tier 2] GEMINI_API_KEY not set. Skipping escalation.');
-        return clauseResults;
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-
     // Build the prompt with clause texts and junior analyst findings
     const escalationPayload = escalationCandidates.map(r => ({
         id: r.id,
@@ -120,76 +112,13 @@ async function runTier2Escalation(clauseResults, clauseTextMap) {
     const userContent = JSON.stringify({ clauses_for_review: escalationPayload });
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
-            systemInstruction: TIER2_SYSTEM_PROMPT,
-            generationConfig: {
-                temperature: 0.1,
-                maxOutputTokens: 8192,
-                thinkingConfig: { thinkingBudget: 0 },
-            },
+        const tier2Results = await callLLM({
+            systemPrompt: TIER2_SYSTEM_PROMPT,
+            userContent: userContent,
+            jsonMode: true,
+            temperature: 0.1,
+            maxTokens: 8192
         });
-
-        let text = '';
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            try {
-                const result = await model.generateContent(userContent);
-                const response = result.response;
-                
-                try { text = response.text(); } catch {}
-                if (!text && response.candidates && response.candidates[0]) {
-                    const parts = response.candidates[0].content?.parts || [];
-                    for (const part of parts) {
-                        if (part.text) text = part.text;
-                    }
-                }
-                break; // Success! Break out of the retry loop.
-            } catch (err) {
-                const errMessage = err.message || '';
-                const isTransient = errMessage.includes('503') || errMessage.includes('quota') || errMessage.includes('timeout') || errMessage.includes('429');
-                
-                if (attempt < 5 && isTransient) {
-                    let delayMs = attempt * 2000; // default backoff
-                    
-                    // Intelligent Quota Wait: "Please retry in 39.2s"
-                    const retryMatch = errMessage.match(/retry in ([\d\.]+)s/i);
-                    if (retryMatch && retryMatch[1]) {
-                        delayMs = (parseFloat(retryMatch[1]) * 1000) + 1000; // Add 1s buffer
-                    }
-                    
-                    console.warn(`[Tier 2] Gemini transient error (attempt ${attempt}/5), retrying in ${Math.round(delayMs/1000)}s...`);
-                    await new Promise(r => setTimeout(r, delayMs));
-                } else {
-                    throw err; // Out of retries or non-transient error
-                }
-            }
-        }
-
-        if (!text) {
-            console.warn('[Tier 2] Empty response from Gemini. Keeping original results.');
-            return clauseResults;
-        }
-
-        // Parse JSON from the response
-        let tier2Results;
-        try {
-            // Try direct parse
-            tier2Results = JSON.parse(text);
-        } catch {
-            // Try extracting from markdown fences
-            const fenced = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-            if (fenced) {
-                try { tier2Results = JSON.parse(fenced[1].trim()); } catch {}
-            }
-            // Try finding JSON object
-            if (!tier2Results) {
-                const firstBrace = text.indexOf('{');
-                const lastBrace = text.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace > firstBrace) {
-                    try { tier2Results = JSON.parse(text.substring(firstBrace, lastBrace + 1)); } catch {}
-                }
-            }
-        }
 
         if (!tier2Results || !tier2Results.results) {
             console.warn('[Tier 2] Could not parse response. Keeping original results.');

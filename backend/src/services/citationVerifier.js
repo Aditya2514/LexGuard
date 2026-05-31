@@ -22,7 +22,7 @@ const Clause = require('../models/Clause');
 function extractCitationsFromRefs(lawRefs) {
     if (!Array.isArray(lawRefs)) return [];
 
-    const SECTION_REGEX = /Section\s+(\d+[A-Z]?(?:\(\d+\))?)/gi;
+    const CITATION_REGEX = /(?:Section|Article|Rule|Regulation|Schedule|Clause|Order)\s+(\d+[A-Z]?(?:\(\d+\))?(?:\([a-z]\))?)/gi;
 
     return lawRefs.map(ref => {
         // Try to find a section number in multiple fields (section_hint first, then reason)
@@ -36,13 +36,14 @@ function extractCitationsFromRefs(lawRefs) {
         let parsedSectionNumber = null;
 
         for (const field of fieldsToSearch) {
-            const match = field.match(SECTION_REGEX);
+            const match = field.match(CITATION_REGEX);
             if (match && match.length > 0) {
                 // Take the first section reference found
-                const sectionMatch = match[0].match(/Section\s+(\d+[A-Z]?(?:\(\d+\))?)/i);
+                const sectionMatch = match[0].match(/(Section|Article|Rule|Regulation|Schedule|Clause|Order)\s+(\d+[A-Z]?(?:\(\d+\))?(?:\([a-z]\))?)/i);
                 if (sectionMatch) {
-                    parsedSection = `Section ${sectionMatch[1]}`;
-                    parsedSectionNumber = sectionMatch[1];
+                    const type = sectionMatch[1].charAt(0).toUpperCase() + sectionMatch[1].slice(1).toLowerCase();
+                    parsedSection = `${type} ${sectionMatch[2]}`;
+                    parsedSectionNumber = sectionMatch[2];
                     break;
                 }
             }
@@ -71,15 +72,70 @@ function extractCitationsFromRefs(lawRefs) {
 // ── Act Key → Database Act Name Mapping ──────────────────────────────────────
 // Maps the rigid act_keys used by agents to fuzzy search terms for the DB
 const ACT_KEY_SEARCH_TERMS = {
+    // Core Contract & Civil
     'INDIAN_CONTRACT_ACT': ['indian contract act', 'contract act 1872'],
-    'DPDP_ACT': ['digital personal data protection', 'dpdp'],
-    'ARBITRATION_ACT': ['arbitration', 'conciliation act'],
-    'IT_ACT': ['information technology act', 'it act 2000'],
-    'PATENTS_ACT': ['patents act', 'patent act 1970'],
+    'SPECIFIC_RELIEF_ACT': ['specific relief act'],
+    'TRANSFER_OF_PROPERTY_ACT': ['transfer of property act'],
+    'SALE_OF_GOODS_ACT': ['sale of goods act'],
+    'NEGOTIABLE_INSTRUMENTS_ACT': ['negotiable instruments act'],
+    'PARTNERSHIP_ACT': ['indian partnership act'],
+    'HINDU_SUCCESSION_ACT': ['hindu succession act'],
+    // Criminal & Evidence
+    'IPC': ['indian penal code', 'ipc '],
+    'CrPC': ['code of criminal procedure', 'crpc'],
+    'EVIDENCE_ACT': ['indian evidence act'],
+    // Corporate & Finance
+    'COMPANIES_ACT': ['companies act'],
+    'INSOLVENCY_CODE': ['insolvency and bankruptcy code', 'ibc '],
+    'SARFAESI_ACT': ['sarfaesi act', 'securitisation and reconstruction'],
+    'COMPETITION_ACT': ['competition act'],
+    'FEMA_ACT': ['foreign exchange management act', 'fema'],
+    'SEBI_INSIDER_TRADING': ['prohibition of insider trading', 'sebi'],
+    'INCOME_TAX_ACT': ['income tax act'],
+    'GST_ACT': ['central goods and services tax', 'cgst'],
+    'FINANCE_ACT_CRYPTO': ['finance act', 'crypto'],
+    'MONEY_LAUNDERING_ACT': ['prevention of money-laundering', 'pmla'],
+    // Labour & Employment
     'INDUSTRIAL_DISPUTES_ACT': ['industrial disputes', 'industrial dispute'],
-    'CONSUMER_PROTECTION_ACT': ['consumer protection'],
-    'PAYMENT_OF_WAGES_ACT': ['payment of wages'],
+    'INDUSTRIAL_RELATIONS_CODE': ['industrial relations code'],
+    'CODE_ON_WAGES': ['code on wages'],
+    'PAYMENT_OF_WAGES_ACT': ['payment of wages act'],
+    'EPF_ACT': ['employees provident funds', 'epf ', 'epfscheme'],
+    'MATERNITY_BENEFIT_ACT': ['maternity benefit act'],
+    'POSH_ACT': ['sexual harassment of women', 'posh act'],
+    'KARNATAKA_STANDING_ORDERS': ['karnataka industrial employment'],
+    // Tech & Privacy
+    'DPDP_ACT': ['digital personal data protection', 'dpdp'],
+    'IT_ACT': ['information technology act', 'it act 2000'],
+    'IT_INTERMEDIARY_RULES': ['intermediary guidelines', 'digital media ethics'],
+    'IT_DEEPFAKE_AMENDMENT': ['deepfake amendment'],
+    'CERT_IN_RULES': ['cert-in', 'computer emergency response team'],
+    'AI_ADVISORY': ['ai advisory'],
+    'TELECOM_ACT': ['telecommunications act'],
+    // IP
+    'PATENTS_ACT': ['patents act', 'patent act 1970'],
     'COPYRIGHT_ACT': ['copyright act'],
+    'TRADE_MARKS_ACT': ['trade marks act'],
+    // Real Estate
+    'RERA_ACT': ['real estate (regulation', 'rera '],
+    'MAHARERA_RULES': ['maharera'],
+    // Consumer & Transport
+    'CONSUMER_PROTECTION_ACT': ['consumer protection act'],
+    'MOTOR_VEHICLES_ACT': ['motor vehicles act'],
+    // Dispute
+    'ARBITRATION_ACT': ['arbitration', 'conciliation act'],
+    // MSME & Misc
+    'MSMED_ACT': ['micro, small and medium', 'msmed'],
+    'DRONE_RULES': ['drone rules'],
+    'SPACE_POLICY': ['indian space policy'],
+    'RTI_ACT': ['right to information', 'rti act'],
+    'TOBACCO_ACT': ['cigarettes and other tobacco', 'cotpa'],
+    'RBI_DIGITAL_LENDING': ['guidelines on digital lending', 'rbi guidelines'],
+    'INFLUENCER_GUIDELINES': ['influencer advertising', 'asci guidelines'],
+    // Criminal Codes
+    'BNS': ['bharatiya nyaya sanhita', 'bns'],
+    'BNSS': ['bharatiya nagarik suraksha sanhita', 'bnss'],
+    'BSA': ['bharatiya sakshya adhiniyam', 'bsa'],
 };
 
 /**

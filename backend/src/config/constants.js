@@ -1,4 +1,7 @@
-const CONTRACT_CATEGORIES = ['employment', 'saas', 'freelance', 'tos', 'privacy', 'other'];
+const CONTRACT_CATEGORIES = [
+    'employment', 'saas', 'freelance', 'tos', 'privacy',
+    'real_estate', 'partnership', 'vendor', 'franchise', 'other'
+];
 
 const CONTRACT_STATUSES = ['pending', 'processing', 'partial', 'done', 'failed'];
 

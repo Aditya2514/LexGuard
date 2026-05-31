@@ -50,19 +50,19 @@ async function scoreClauseConfidence(clause, contract) {
       totalWeight += 25; // 0 points
     }
 
-    // HyDE Retrieval (15%)
-    // If it successfully pulled law refs, we give it a good score.
-    // We can use the highest similarity score if available, or just a flat 85-100 for successful retrieval.
-    const hydeScore = hasLawRefs ? 90 : 0;
+    // HyDE Retrieval (15%) - Proxy using existence of law refs
+    const hasRetrievedContext = hasLawRefs;
+    const hydeScore = hasRetrievedContext ? 85 : 30;
     earnedPoints += (hydeScore * 0.15);
     totalWeight += 15;
   }
 
   // 5. Agent 9 Cross-Ref (15% Weight)
-  // If Agent 9 ran successfully on the contract, we assign a high score for this metric.
-  // We can check if the contract has crossRefFindings initialized (even if empty).
   if (contract && contract.crossRefFindings !== undefined) {
-    earnedPoints += (100 * 0.15);
+    const crossRefIssuesForClause = (contract.crossRefFindings || [])
+      .filter(f => f.severity === 'high' && f.location_hint && f.location_hint.includes(`Clause ${clause.segmentIndex}`)).length;
+    const agent9Score = crossRefIssuesForClause > 0 ? 50 : 100;
+    earnedPoints += (agent9Score * 0.15);
     totalWeight += 15;
   }
 

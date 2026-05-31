@@ -27,7 +27,7 @@ function cosineSimilarity(vecA, vecB) {
 async function retrieveCaseLawPrecedents(queryText, topK = 3, threshold = 0.5) {
   try {
     // 1. Embed the query text
-    const queryVector = await generateEmbedding(queryText);
+    const queryVector = await generateEmbedding(queryText, 'search_query');
     if (!queryVector) {
         console.warn(`⚠️ [RAG] Failed to embed query text for case law retrieval.`);
         return [];
@@ -64,7 +64,7 @@ async function retrieveCaseLawPrecedents(queryText, topK = 3, threshold = 0.5) {
  * Generates the embedding automatically before saving.
  */
 async function seedCaseLaw(case_title, citation, legal_domain, summary) {
-    const embedding = await generateEmbedding(summary);
+    const embedding = await generateEmbedding(summary, 'search_document');
     if (!embedding) throw new Error("Failed to generate embedding for case law.");
 
     const newCase = await CaseLaw.create({
