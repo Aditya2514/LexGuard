@@ -4,14 +4,39 @@
     "action": "force_critical",
     "reason": "California Business and Professions Code Section 16600 voids post-employment non-competes regardless of the contract's stated governing law."
   },
+  "Washington": {
+    "overrides": ["non_compete"],
+    "action": "force_critical",
+    "reason": "Washington State law restricts non-competes for employees earning less than the mandated threshold, and strictly limits duration."
+  },
   "India": {
     "overrides": ["non_compete"],
     "action": "force_critical",
     "reason": "Section 27 of the Indian Contract Act voids post-employment non-competes, overriding foreign governing law clauses if executed locally."
   },
-  "Washington": {
-    "overrides": ["non_compete"],
+  "Maharashtra": {
+    "overrides": ["non_compete", "compensation", "delivery_possession", "timeline_performance"],
     "action": "force_critical",
-    "reason": "Washington State law restricts non-competes for employees earning less than the mandated threshold, and strictly limits duration."
+    "reason": "MahaRERA Rules, 2017 cap advance payments at 10% and mandate RERA registration. Section 27 of Indian Contract Act voids post-employment non-competes."
+  },
+  "Karnataka": {
+    "overrides": ["non_compete", "termination"],
+    "action": "force_critical",
+    "reason": "Karnataka Industrial Employment (Standing Orders) Rules, 1961 mandate specific termination procedures and notice periods."
+  },
+  "Delhi": {
+    "overrides": ["non_compete"],
+    "action": "force_critical", 
+    "reason": "Delhi High Court consistently holds post-employment non-competes void under Section 27, Indian Contract Act."
+  },
+  "Tamil Nadu": {
+    "overrides": ["non_compete", "compensation"],
+    "action": "force_critical",
+    "reason": "Tamil Nadu Shops and Establishments Act imposes specific wage and termination protections."
+  },
+  "Gujarat": {
+    "overrides": ["non_compete", "delivery_possession"],
+    "action": "force_critical",
+    "reason": "Gujarat RERA rules and Section 27 protections apply."
   }
 }

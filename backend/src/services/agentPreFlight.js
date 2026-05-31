@@ -19,6 +19,7 @@ Required Schema:
   "metadata": {
     "documentType": "String (e.g., 'Employment Agreement', 'Real Estate Contract', 'Non-Disclosure Agreement')",
     "governingLaw": "String (e.g., 'Republic of India / State of Karnataka')",
+    "executionDate": "String (ISO 8601 Date or YYYY-MM-DD)",
     "employerName": "String",
     "employeeDesignation": "String",
     "employeeAddress": "String (The physical city/state/country of the employee)",
@@ -40,8 +41,8 @@ Under 'globalDefinitions', map each actual defined term name (e.g., 'Proprietary
  * @returns {Promise<object>}
  */
 async function runAgentPreFlight(rawText) {
-  // Extract initial slice (first 12,000 characters) where recitals and definitions live
-  const sampleText = (rawText || '').substring(0, 12000).trim();
+  // Extract initial slice (first 20,000 characters) where recitals and definitions live
+  const sampleText = (rawText || '').substring(0, 20000).trim();
 
   // If the contract is completely blank, return empty structured fallback
   if (!sampleText) {
@@ -66,11 +67,30 @@ async function runAgentPreFlight(rawText) {
       maxTokens: 1500,
     });
 
+    // Tail scan for governing law if missing
+    if (!resp?.metadata?.governingLaw && rawText.length > 20000) {
+      const tailText = rawText.slice(-5000).trim();
+      if (tailText) {
+        const tailResp = await callLLM({
+          systemPrompt: PRE_FLIGHT_SYSTEM_PROMPT,
+          userContent: tailText,
+          jsonMode: true,
+          temperature: 0.1,
+          maxTokens: 1500,
+        });
+        if (tailResp?.metadata?.governingLaw) {
+          if (!resp.metadata) resp.metadata = {};
+          resp.metadata.governingLaw = tailResp.metadata.governingLaw;
+        }
+      }
+    }
+
     // Ensure safe structured defaults in case of incomplete/partial object returns
     return {
       metadata: {
         documentType: resp?.metadata?.documentType || null,
         governingLaw: resp?.metadata?.governingLaw || null,
+        executionDate: resp?.metadata?.executionDate || null,
         employerName: resp?.metadata?.employerName || null,
         employeeDesignation: resp?.metadata?.employeeDesignation || null,
         employeeAddress: resp?.metadata?.employeeAddress || null,

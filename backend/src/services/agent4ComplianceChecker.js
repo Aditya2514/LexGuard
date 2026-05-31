@@ -74,8 +74,9 @@ async function runComplianceCheckForContract(contractId) {
 
         for (const c of clauses) {
             const isRisky = c.risk_level === 'medium' || c.risk_level === 'high' || c.risk_level === 'critical';
+            const shouldScan = isRisky || process.env.FULL_COMPLIANCE_SCAN === 'true';
             
-            if (isRisky) {
+            if (shouldScan) {
                 // Fetch dynamic context
                 const statutoryContext = await retrieveComplianceContext(
                     contract.contractCategory || "General",

@@ -18,7 +18,11 @@ const statuteNodeSchema = new mongoose.Schema({
   embedding: {
     type: [Number],
     required: true
-  }
+  },
+  isRepealed: { type: Boolean, default: false, index: true },
+  repealedBy: { type: String, default: null },     // e.g. "Bharatiya Nyaya Sanhita, 2023"
+  effectiveDate: { type: Date, default: null },       // When this provision came into force
+  amendedDate: { type: Date, default: null }       // Last amendment date
 });
 
 // Compound index to guarantee lookup performance and enforce no double-ingestion of the same section

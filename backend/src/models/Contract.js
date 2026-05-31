@@ -57,6 +57,11 @@ const contractSchema = new mongoose.Schema(
       enum: CONTRACT_CATEGORIES,
       required: [true, 'Contract category is required'],
     },
+    executionDate: {
+      type: Date,
+      default: null,
+      description: 'The date the contract was executed or goes into effect'
+    },
     financial_obligations: [{
       amount: { type: Number },
       currency: { type: String, default: 'INR' },

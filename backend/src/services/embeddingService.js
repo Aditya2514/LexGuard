@@ -1,103 +1,67 @@
-/**
- * Service to generate vector embeddings for text using HuggingFace API.
- * Uses the lightweight and fast sentence-transformers/all-MiniLM-L6-v2 model.
- */
+const { pipeline, env } = require('@xenova/transformers');
+const Clause = require('../models/Clause');
 
-const pLimit = require('p-limit');
-const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+// Configure Transformers.js to use local cache if needed, though default is usually fine.
+// Some environments need env.allowLocalModels = false if pulling from HF directly.
 
-// Max 5 concurrent embedding calls globally to prevent HTTP 429
-const embeddingLimiter = limitFn(5);
-
-async function generateEmbedding(text) {
-  const apiKey = process.env.HUGGINGFACE_API_KEY;
-  if (!apiKey) {
-    throw new Error('HUGGINGFACE_API_KEY is not defined. Cannot generate embeddings.');
+class EmbeddingService {
+  constructor() {
+    this.modelName = 'Xenova/nomic-embed-text-v1'; 
+    this.extractor = null;
   }
 
-  const model = 'sentence-transformers/all-MiniLM-L6-v2';
-  const url = `https://router.huggingface.co/hf-inference/models/${model}/pipeline/feature-extraction`;
-
-  return embeddingLimiter(async () => {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            inputs: [text],
-            options: { wait_for_model: true }
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HF Embedding Error (${response.status}): ${errorText}`);
-        }
-
-        const vectors = await response.json();
-        // The API returns an array of arrays (one vector per input). We sent one input.
-        if (Array.isArray(vectors) && vectors.length > 0 && Array.isArray(vectors[0])) {
-          return vectors[0]; // Return the 384-dimensional vector
-        }
-
-        throw new Error('Invalid response format from embedding model');
-      } catch (err) {
-        if (attempt < 3) {
-          console.warn(`⚠️ [EmbeddingService] Failed to generate embedding (attempt ${attempt}/3). Retrying in 2s...`);
-          await new Promise(res => setTimeout(res, 2000));
-          continue;
-        }
-        throw err;
-      }
+  async init() {
+    if (!this.extractor) {
+      this.extractor = await pipeline('feature-extraction', this.modelName);
     }
-  });
+  }
+
+  async generateEmbedding(text, taskType = 'search_document') {
+    await this.init();
+    
+    // Nomic architecture highly recommends prefixes for optimal vector alignment
+    const prefix = taskType === 'search_query' ? 'search_query: ' : 'search_document: ';
+    const cleanText = prefix + text.replace(/\s+/g, ' ').trim();
+    
+    // Process through transformers.js pipeline
+    const output = await this.extractor(cleanText, {
+      pooling: 'mean',
+      normalize: true,
+    });
+
+    return Array.from(output.data);
+  }
 }
 
-/**
- * Convenience method to embed multiple clauses and return a map of clauseId -> vector
- */
+const embeddingServiceInstance = new EmbeddingService();
+
+async function generateEmbedding(text, taskType = 'search_document') {
+    return embeddingServiceInstance.generateEmbedding(text, taskType);
+}
+
+// Keep the existing helper functions
 async function embedMultipleClauses(clausesTextList) {
     const vectors = [];
     for (const text of clausesTextList) {
-        // Simple sequential for rate limit safety on free tier
-        const vector = await generateEmbedding(text);
+        const vector = await generateEmbedding(text, 'search_document');
         vectors.push(vector);
     }
     return vectors;
 }
 
-const Clause = require('../models/Clause');
-
-/**
- * Generate and store embeddings for all clauses in a contract.
- */
 async function embedClausesForContract(contractId) {
     const clauses = await Clause.find({ contractId }).select('_id rawText embedding');
     if (!clauses || clauses.length === 0) return;
 
     console.log(`[EmbeddingService] Generating embeddings for ${clauses.length} clauses...`);
     
-    // We can process in batches to avoid rate limits
-    const BATCH_SIZE = 5;
-    for (let i = 0; i < clauses.length; i += BATCH_SIZE) {
-        const batch = clauses.slice(i, i + BATCH_SIZE);
-        const promises = batch.map(async (clause) => {
-            if (clause.embedding && clause.embedding.length > 0) return; // Skip if already embedded
-            const vector = await generateEmbedding(clause.rawText);
-            if (vector) {
-                clause.embedding = vector;
-                await clause.save();
-            }
-        });
-        await Promise.all(promises);
-        
-        // Brief pause between batches for free tier
-        if (i + BATCH_SIZE < clauses.length) {
-            await new Promise(r => setTimeout(r, 1000));
+    for (let i = 0; i < clauses.length; i++) {
+        const clause = clauses[i];
+        if (clause.embedding && clause.embedding.length > 0) continue; 
+        const vector = await generateEmbedding(clause.rawText, 'search_document');
+        if (vector) {
+            clause.embedding = vector;
+            await clause.save();
         }
     }
     console.log(`✅ [EmbeddingService] Embeddings generated successfully.`);
@@ -116,31 +80,25 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-/**
- * Searches for clauses similar to the query string within the same contract
- * using in-memory cosine similarity (Zero-Rupee RAG).
- */
 async function searchSimilarClauses(contractId, queryText, topK = 3) {
-  const queryVector = await generateEmbedding(queryText);
+  const queryVector = await generateEmbedding(queryText, 'search_query');
   if (!queryVector) return [];
 
-  // Fetch all clauses for this contract that have valid non-empty embeddings
   const clauses = await Clause.find({
     contractId,
     embedding: { $exists: true, $ne: null, $not: { $size: 0 } }
   }).select('_id rawText embedding segmentIndex');
   
   const scoredClauses = clauses
-    .filter(c => Array.isArray(c.embedding) && c.embedding.length > 0) // In-memory safety net
+    .filter(c => Array.isArray(c.embedding) && c.embedding.length > 0) 
     .map(c => ({
       clauseId: c._id,
       segmentIndex: c.segmentIndex,
       rawText: c.rawText,
       score: cosineSimilarity(queryVector, c.embedding)
     }))
-    .filter(c => !isNaN(c.score)); // Guard against NaN from degenerate vectors
+    .filter(c => !isNaN(c.score)); 
 
-  // Sort by highest similarity
   scoredClauses.sort((a, b) => b.score - a.score);
   return scoredClauses.slice(0, topK);
 }

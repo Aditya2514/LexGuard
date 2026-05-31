@@ -6,18 +6,59 @@ const StatuteNode = require('../models/StatuteNode');
 /**
  * Dynamically retrieves relevant Indian Statutory Sections based on contract ontology and semantics
  */
-async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central") {
+async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central", executionDate = null) {
   try {
     // 1. Fetch the exact statutory routing domains for this specific intersection
     const mapping = await LegalDomainMap.findOne({ contractType, clauseType });
-    const activeDomains = mapping ? mapping.targetDomains : ["general_contract_law", "real_estate_law", "labor_law", "data_privacy"];
+    
+    const CLAUSE_TYPE_DOMAIN_FALLBACK = {
+      'non_compete': ['labor_law', 'general_contract_law'],
+      'non_solicitation': ['labor_law', 'general_contract_law'],
+      'compensation': ['labor_law', 'general_contract_law'],
+      'termination': ['labor_law', 'general_contract_law'],
+      'privacy_data': ['data_privacy', 'general_contract_law'],
+      'delivery_possession': ['real_estate_law', 'general_contract_law'],
+      'ip_assignment': ['intellectual_property', 'general_contract_law'],
+      'intellectual_property': ['intellectual_property', 'general_contract_law'],
+      'dispute_resolution': ['dispute_resolution', 'general_contract_law'],
+      'governing_law': ['dispute_resolution', 'general_contract_law'],
+      'confidentiality': ['labor_law', 'data_privacy'],
+      'indemnification': ['general_contract_law'],
+      'liability_limit': ['general_contract_law', 'consumer_protection'],
+      'auto_renewal': ['general_contract_law', 'consumer_protection'],
+      'amendment': ['general_contract_law', 'labor_law'],
+      'warranty': ['general_contract_law', 'consumer_protection'],
+      'force_majeure': ['general_contract_law'],
+      'disclosure': ['real_estate_law', 'general_contract_law'],
+      'timeline_performance': ['real_estate_law', 'general_contract_law'],
+      'licensing': ['intellectual_property', 'general_contract_law'],
+      'other': ['general_contract_law']
+    };
+    
+    const activeDomains = mapping ? mapping.targetDomains : (CLAUSE_TYPE_DOMAIN_FALLBACK[clauseType] || ['general_contract_law']);
 
     console.log(`⚖️ [Ontology Router] Mapping [${contractType} ➔ ${clauseType}] to Domains:`, activeDomains);
 
-    // 2. Generate the 384-dimensional dense vector for the target clause wording
-    const queryVector = await generateEmbedding(clauseText);
+    // 2. Generate the 768-dimensional dense vector for the target clause wording
+    const queryVector = await generateEmbedding(clauseText, 'search_query');
 
     // 3. Use the imported StatuteNode model (avoids OverwriteModelError on concurrent calls)
+
+    // Build filter based on executionDate
+    const vectorFilter = {
+        domain: { $in: activeDomains },
+        jurisdiction: { $in: ["Central", jurisdiction] }
+    };
+    
+    // If contract was executed before July 1, 2024, don't filter out repealed laws (IPC/CrPC still apply)
+    // If no execution date or after July 1, 2024, filter out repealed laws
+    const cutoffDate = new Date('2024-07-01');
+    const execDate = executionDate ? new Date(executionDate) : new Date();
+    
+    const matchFilter = {};
+    if (execDate >= cutoffDate) {
+        matchFilter.isRepealed = { $ne: true };
+    }
 
     // 4. Run native Atlas Vector Search with metadata domain filters
     const statutoryMatches = await StatuteNode.aggregate([
@@ -26,13 +67,16 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
           index: "lexguard_statutes_vector_index", // Index registered in Atlas
           path: "embedding",
           queryVector: queryVector,
-          numCandidates: 30,
-          limit: 3,
-          filter: { 
-            domain: { $in: activeDomains },
-            jurisdiction: { $in: ["Central", jurisdiction] }
-          } // Strict compliance scoping: zero contamination, scoped to jurisdiction + Central
+          numCandidates: 100,
+          limit: 20,
+          filter: vectorFilter // Use indexed fields here for efficiency
         }
+      },
+      {
+        $match: matchFilter // Use unindexed fields here
+      },
+      {
+        $limit: 5
       },
       {
         $project: {
@@ -45,7 +89,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       }
     ]);
 
-    const RELEVANCE_THRESHOLD = 0.70;
+    const RELEVANCE_THRESHOLD = 0.60;
     const relevantMatches = statutoryMatches.filter(match => match.similarityScore >= RELEVANCE_THRESHOLD);
 
     if (relevantMatches.length === 0) {
