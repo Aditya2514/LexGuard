@@ -226,6 +226,11 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
         <td className="clause-preview">{preview}</td>
         <td className="confidence-cell">
           <ConfidenceBadge score={clause.overall_confidence_score} level={clause.overall_confidence_level} />
+          {clause.tier2_escalated && (
+            <div style={{ marginTop: '0.4rem', fontSize: '0.7rem', color: '#9333ea', fontWeight: 'bold', background: '#faf5ff', padding: '2px 4px', borderRadius: '4px', border: '1px solid #e9d5ff', display: 'inline-block' }}>
+              👑 Sr. Partner
+            </div>
+          )}
         </td>
       </tr>
 
@@ -266,6 +271,47 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                         This score is aggregated from Agent 2 self-reflection, Tier 2 Partner Escalation outcomes, strict Citation Verification, RAG retrieval quality, and Agent 9 cross-reference audits.
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tier 2 Senior Partner Escalation */}
+              {clause.tier2_escalated && (
+                <div className="expanded-section" style={{ borderLeft: '4px solid #9333ea', backgroundColor: '#faf5ff', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+                  <h4 className="expanded-label" style={{ color: '#7e22ce', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span>👑</span> Tier 2 Senior Partner Escalation
+                  </h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <span style={{ 
+                      padding: '0.2rem 0.6rem', 
+                      borderRadius: '12px', 
+                      fontSize: '0.8rem', 
+                      fontWeight: 'bold', 
+                      backgroundColor: clause.tier2_agrees ? '#dcfce7' : '#fee2e2',
+                      color: clause.tier2_agrees ? '#166534' : '#991b1b'
+                    }}>
+                      {clause.tier2_agrees ? '✅ Partner Verified Agent Findings' : '❌ Partner Overruled Agent'}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontStyle: 'italic', color: '#6b21a8', lineHeight: '1.5' }}>
+                    "{clause.tier2_senior_note}"
+                  </p>
+                </div>
+              )}
+
+              {/* Agent 6: Adversarial Red-Teaming */}
+              {clause.adversarial_warning && (
+                <div className="expanded-section" style={{ border: '2px solid #ef4444', backgroundColor: '#fef2f2', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', boxShadow: '0 0 15px rgba(239, 68, 68, 0.2)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '1.5rem', animation: 'pulse 2s infinite' }}>🚨</span>
+                    <h4 className="expanded-label" style={{ color: '#b91c1c', margin: 0, fontWeight: '800' }}>RED TEAM ADVERSARIAL WARNING</h4>
+                  </div>
+                  <p style={{ margin: '0 0 1rem 0', color: '#991b1b', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                    {clause.adversarial_warning}
+                  </p>
+                  <h5 style={{ color: '#991b1b', margin: '0 0 0.5rem 0', fontSize: '0.85rem', textTransform: 'uppercase' }}>🛡️ Hardened Defensive Counter-Clause:</h5>
+                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #fca5a5', padding: '0.75rem', borderRadius: '4px', color: '#7f1d1d', fontStyle: 'italic' }}>
+                    {clause.hardened_rewrite}
                   </div>
                 </div>
               )}
@@ -358,6 +404,19 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                 </div>
               )}
 
+              {clause.rewritten_text && (
+                <div className="expanded-section rewrite-section" style={{ border: '1px solid #3b82f6', backgroundColor: '#eff6ff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <h4 className="expanded-label" style={{ marginBottom: 0, color: '#1d4ed8' }}>✒️ Agent 8 Drafter Final Redline</h4>
+                  </div>
+                  <div className="rewrite-box" style={{ borderColor: '#bfdbfe', backgroundColor: '#ffffff' }}>
+                    <p className="expanded-text" style={{ fontStyle: 'italic', margin: 0, lineHeight: '1.6', color: '#1e3a8a' }}>
+                      {clause.rewritten_text}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Law references */}
               {clause.possible_law_references?.length > 0 && (
                 <div className="expanded-section">
@@ -381,7 +440,7 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                       const isPrecedent = ref.act_key === 'CASE_LAW';
                       const vStatus = ref.verification_status;
                       const verificationBadge = vStatus === 'verified'
-                        ? { icon: '✅', label: 'Verified', color: '#10b981' }
+                        ? { icon: '✅', label: 'Cross-Encoder Verified', color: '#10b981' }
                         : vStatus === 'misquoted'
                         ? { icon: '⚠️', label: 'Misquoted', color: '#f59e0b' }
                         : vStatus === 'not_found'
