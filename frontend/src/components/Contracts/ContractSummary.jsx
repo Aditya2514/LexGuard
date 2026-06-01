@@ -22,6 +22,14 @@ export default function ContractSummary({ contract, riskSummary }) {
             <span className="meta-clauses">{contract?.totalClauses || 0} clauses</span>
             <span className="meta-separator">·</span>
             <span className="meta-status">{contract?.status}</span>
+            {contract?.globalContext?.jurisdiction && (
+              <>
+                <span className="meta-separator">·</span>
+                <span className="meta-jurisdiction" style={{ color: '#0ea5e9', fontWeight: 'bold' }}>
+                  📍 {contract.globalContext.jurisdiction}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <div className="summary-risk-main tour-risk-badge">
