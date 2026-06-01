@@ -1,11 +1,13 @@
-# Use official Node.js Alpine image for a small footprint
-FROM node:20-alpine
+# Use Debian slim image to resolve glibc dependency errors with onnxruntime-node
+FROM node:20-slim
 
 # Install system dependencies for OCR fallback pipeline
 # tesseract-ocr: Optical character recognition for scanned PDFs
 # poppler-utils: pdftoppm to convert PDF pages to images for OCR
-# tessdata: English language training data for Tesseract
-RUN apk add --no-cache tesseract-ocr poppler-utils
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
