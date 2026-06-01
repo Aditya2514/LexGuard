@@ -450,6 +450,36 @@ export default function ContractDetailPage() {
     <p>${c.explanatory_note || 'No significant Indian law compliance issues flagged.'}</p>
 `;
 
+        if (c.tier2_escalated) {
+          htmlContent += `
+    <div style="background-color: #faf5ff; border-left: 4px solid #9333ea; padding: 10px; margin-top: 10pt; margin-bottom: 10pt;">
+      <p style="margin: 0; color: #7e22ce;"><strong>👑 Tier 2 Senior Partner Escalation:</strong></p>
+      <p style="margin: 5px 0 0 0; color: #6b21a8; font-style: italic;">"${c.tier2_senior_note}"</p>
+      <p style="margin: 5px 0 0 0; color: ${c.tier2_agrees ? '#166534' : '#991b1b'};"><strong>Status:</strong> ${c.tier2_agrees ? 'Partner Verified Agent Findings' : 'Partner Overruled Agent'}</p>
+    </div>
+`;
+        }
+
+        if (c.adversarial_warning) {
+          htmlContent += `
+    <div style="border: 2px solid #ef4444; background-color: #fef2f2; padding: 10px; margin-top: 10pt; margin-bottom: 10pt;">
+      <p style="margin: 0; color: #b91c1c;"><strong>🚨 RED TEAM ADVERSARIAL WARNING:</strong></p>
+      <p style="margin: 5px 0 10px 0; color: #991b1b; font-weight: bold;">${c.adversarial_warning}</p>
+      <p style="margin: 0; color: #991b1b; font-size: 9pt; text-transform: uppercase;"><strong>Hardened Defensive Counter-Clause:</strong></p>
+      <p style="margin: 5px 0 0 0; border: 1px solid #fca5a5; padding: 8px; background-color: #ffffff; color: #7f1d1d; font-style: italic;">${c.hardened_rewrite}</p>
+    </div>
+`;
+        }
+
+        if (c.rewritten_text) {
+          htmlContent += `
+    <div style="background-color: #eff6ff; border: 1px solid #3b82f6; padding: 10px; margin-top: 10pt; margin-bottom: 10pt;">
+      <p style="margin: 0; color: #1d4ed8;"><strong>✒️ Agent 8 Drafter Final Redline:</strong></p>
+      <p style="margin: 5px 0 0 0; color: #1e3a8a; font-style: italic;">${c.rewritten_text}</p>
+    </div>
+`;
+        }
+
         if (c.potential_issue_areas?.length > 0) {
           htmlContent += `
     <p><strong>Potential Issues under Indian Law:</strong></p>
@@ -570,7 +600,34 @@ export default function ContractDetailPage() {
     <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Worst-Case Legal Scenario:</strong></p>
     <p style="color: #991b1b; font-weight: 500; margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">${c.worst_case_scenario || '—'}</p>
 `;
-        if (c.suggested_rewrite) {
+        if (c.tier2_escalated) {
+          htmlContent += `
+    <div style="background-color: #faf5ff; border-left: 4px solid #9333ea; padding: 10px; margin-bottom: 8pt;">
+      <p style="margin: 0; color: #7e22ce; font-size: 11pt;"><strong>👑 Tier 2 Senior Partner Escalation:</strong></p>
+      <p style="margin: 5px 0 0 0; color: #6b21a8; font-style: italic; font-size: 10pt;">"${c.tier2_senior_note}"</p>
+    </div>
+`;
+        }
+
+        if (c.adversarial_warning) {
+          htmlContent += `
+    <div style="border: 2px solid #ef4444; background-color: #fef2f2; padding: 10px; margin-bottom: 8pt;">
+      <p style="margin: 0; color: #b91c1c; font-size: 11pt;"><strong>🚨 RED TEAM ADVERSARIAL WARNING:</strong></p>
+      <p style="margin: 5px 0 10px 0; color: #991b1b; font-weight: bold; font-size: 10pt;">${c.adversarial_warning}</p>
+      <p style="margin: 0; color: #991b1b; font-size: 9pt; text-transform: uppercase;"><strong>Hardened Defensive Counter-Clause:</strong></p>
+      <p style="margin: 5px 0 0 0; border: 1px solid #fca5a5; padding: 8px; background-color: #ffffff; color: #7f1d1d; font-style: italic; font-size: 10pt;">${c.hardened_rewrite}</p>
+    </div>
+`;
+        }
+
+        if (c.rewritten_text) {
+          htmlContent += `
+    <div style="background-color: #eff6ff; border: 1px solid #3b82f6; padding: 10px; margin-bottom: 8pt;">
+      <p style="margin: 0; color: #1d4ed8; font-size: 11pt;"><strong>✒️ Agent 8 Drafter Final Redline:</strong></p>
+      <p style="margin: 5px 0 0 0; color: #1e3a8a; font-style: italic; font-size: 10pt;">${c.rewritten_text}</p>
+    </div>
+`;
+        } else if (c.suggested_rewrite) {
           htmlContent += `
     <p style="margin-top: 0; margin-bottom: 8pt; font-size: 11pt;"><strong>Suggested Fair Rewrite:</strong></p>
     <p style="color: #10b981; font-weight: 500; font-style: italic; margin-top: 0; margin-bottom: 8pt; font-size: 11pt;">"${c.suggested_rewrite}"</p>

@@ -65,15 +65,18 @@ graph TB
         Queue["Job Queue Service"]
     end
 
-    subgraph "6-Agent AI Pipeline"
-        A0["Agent 0: PreFlight"]
+    subgraph "8-Agent AI Pipeline"
+        A0["Agent 0: PreFlight & Map-Reduce"]
         A1["Agent 1: Clause Extractor"]
-        A2["Agent 2: Risk Analyst"]
+        A2["Agent 2: Risk Analyst (Tier 1 & 2)"]
         A25["Agent 2.5: Adversarial Judge"]
         V6["V6 Deterministic Traps"]
         A3["Agent 3: User Advocate"]
-        A4["Agent 4: Compliance Checker"]
+        A4["Agent 4: Compliance & Geo-RAG"]
         A5["Agent 5: Contract Chat"]
+        A6["Agent 6: Red-Team Adversary"]
+        A8["Agent 8: The Drafter"]
+        CX["Semantic Cross-Encoder"]
     end
 
     subgraph "Data Layer"
@@ -254,9 +257,12 @@ graph LR
     A25 --> V6["🛡️ V6 Traps\n18 Patterns"]
     V6 --> A3["💬 Agent 3\nUser Advocate"]
     V6 --> A4["📜 Agent 4\nCompliance"]
+    V6 --> A6["🚨 Agent 6\nRed-Team"]
+    A3 --> A8["✒️ Agent 8\nDrafter"]
+    A4 --> CX["✅ Cross-Encoder\nCitation Verify"]
     V6 --> EMB["🔢 Embeddings"]
-    A3 --> Done["✅ Complete"]
-    A4 --> Done
+    A8 --> Done["✅ Complete"]
+    CX --> Done
     EMB --> Done
 ```
 
@@ -398,6 +404,18 @@ After the LLM and Judge return their results, three deterministic sanitization f
 4. Falls back to loading the first 20 clauses if vector search fails
 
 **Temperature:** 0.3
+
+### 5.10 Agent 6 — Adversarial Red-Teaming
+
+**Purpose:** Scans MEDIUM/HIGH/CRITICAL clauses strictly looking for adversarial traps that might have slipped through early detection. Generates `adversarial_warning` and a `hardened_rewrite` (a heavily defensive counter-clause).
+
+### 5.11 Agent 8 — The Drafter (Auto-Redlining)
+
+**Purpose:** Consumes the outputs of Agent 3 (Suggested Rewrite) and Agent 6 (Hardened Rewrite) and generates the definitive `rewritten_text` for the clause. This is a highly deterministic, context-aware semantic redline pass used directly in the Word Export feature.
+
+### 5.12 Semantic Cross-Encoder (Citation Verification)
+
+**Purpose:** An entirely local $O(N)$ semantic verification layer. Instead of relying on brute-force vector distance (Bi-Encoders), it passes both the retrieved 1872 Bare Act text and the LLM's summary simultaneously through transformer attention layers to compute the true relationship. Produces `citation_accuracy` and assigns `Cross-Encoder Verified` badges to legal precedents.
 
 ---
 
