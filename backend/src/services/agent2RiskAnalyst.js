@@ -85,7 +85,7 @@ You must reply with valid JSON only, with this structure:
 - Dynamic Citation Subtitles: When citing a specific statutory section, NEVER copy the title or label string from retrieved_legal_context verbatim. You MUST generate a fresh, context-specific subtitle derived from the actual violation pattern in the clause text (e.g., if the clause discusses escrow credits, write 'Section 74 - Conditional Escrow Forfeiture', NOT 'Section 74 - Unenforceable training bonds & administrative markup').
 - **SEMANTIC UNMASKING PROTOCOL (CRITICAL)**: You MUST ignore polite, formal, or "professional" corporate tone. Adversarial clauses often use words like "gesture of mutual commitment", "performance escrow", or "protect trade secrets" to disguise illegal wage theft or non-competes. Look strictly at the MATERIAL LEGAL EFFECT on the employee. If a clause results in forfeiture of assets, restricts future employment, or waives rights, it is HIGH/CRITICAL risk, regardless of how gently it is phrased.
 - Safe Harbor Validation Protocol: Before assigning a MEDIUM, HIGH, or CRITICAL risk rating to any clause, evaluate whether the contract text explicitly uses saving or protective qualifiers. If a clause explicitly guarantees compliance with statutory frameworks (e.g., "in absolute accordance with applicable local regulations", "conforming strictly with the state Shops and Establishments framework", "limited strictly to in-scope working hours", or "mutual consensus of both parties"), you MUST default to LOW risk (score 1-2) for that clause, unless an explicit contractual penalty, waiver, unconscionable indemnification, unilateral force majeure, or punitive mechanism is also present in the same clause text. The mere mention of a legal term (such as "Arbitration", "Confidentiality", "Intellectual Property", or "Non-Solicitation") must NOT trigger a risk elevation if the mechanism described is inherently mutual, consensual, time-limited to a reasonable period, or textually compliant with Indian default statutory protections. However, sweeping captures of pre-existing intellectual property, indemnifications covering gross negligence, or terminations without payment for work performed MUST be flagged as HIGH/CRITICAL.
-- **Precedent Prioritization Protocol**: If a Supreme Court or High Court Precedent (act_key: CASE_LAW) is provided in your retrieved_legal_context, you MUST prioritize its holdings over the raw statutory text of a Bare Act, as judicial precedent governs the application of the statute. explicitly cite the holding of the case when explaining your risk reasons.
+- **Precedent Prioritization Protocol (Stare Decisis)**: If a Supreme Court Precedent explicitly invalidates or modifies the application of a provided Statutory Context, the Precedent is the absolute, overriding authority. Evaluate the contract against the Precedent.
 - **CRITICAL ANALYSIS: COMMERCIAL ASYMMETRY & LEVERAGE**: You must evaluate this clause for hidden economic or procedural abuse. A clause is ASYMMETRIC if it meets any of the following criteria:
   1. Unilateral Discretion: One party can change terms, metrics, or schedules without the other's consent.
   2. Procedural Capture: One party controls dispute resolution rules, venues, or arbitration selection.
@@ -380,8 +380,8 @@ Governing Framework: ${globalContext.metadata?.governingLaw || "Not Explicitly D
 Corporate Employer: ${globalContext.metadata?.employerName || "Not Explicitly Defined"}
 Target Designation: ${globalContext.metadata?.employeeDesignation || "Not Explicitly Defined"}
 ${dynamicConstraints}
-Global Definitions Mapping Matrix:
-${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
+Global Graph RAG Symbol Table (Extracted Definitions):
+${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
 ======================================================================
 
 [ACTIVE TARGET EVALUATION CLAUSE TEXT]:
@@ -528,12 +528,12 @@ ${JSON.stringify(globalContext.globalDefinitions || {}, null, 2)}
     const previousScore = resultObj.risk_score;
     resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
-    // Phase 4A: Semantic Trap Detection (Gated)
+    // Phase 4A: Tri-Layer Trap Detection (Vector Fingerprinting + LLM Fallback)
     if (process.env.ENABLE_SEMANTIC_TRAP_DETECTION === 'true' && resultObj.risk_level !== 'critical') {
-        const { detectSemanticTraps } = require('./classifierService');
-        const semanticTraps = await detectSemanticTraps(clauseTextMap[baseAnalysis.id] || "");
-        if (semanticTraps.length > 0) {
-             const trap = semanticTraps[0];
+        const { detectVectorAndSemanticTraps } = require('./classifierService');
+        const advancedTraps = await detectVectorAndSemanticTraps(clauseTextMap[baseAnalysis.id] || "");
+        if (advancedTraps.length > 0) {
+             const trap = advancedTraps[0];
              resultObj.risk_level = trap.severity === 'critical' ? 'critical' : 'high';
              resultObj.risk_score = trap.severity === 'critical' ? 9 : 8;
              resultObj.risk_reasons = [
@@ -628,12 +628,29 @@ async function analyseRisksForContract(contractId) {
   }).select('_id rawText clause_type segmentIndex').sort({ segmentIndex: 1 });
 
   if (clauses.length > 0) {
+    const { resolveJurisdiction } = require('./../utils/geoMapper');
+    const searchStr = ((enhancedGlobalContext.metadata?.governingLaw || "") + " " + (enhancedGlobalContext.metadata?.jurisdiction || ""));
+    const geo = resolveJurisdiction(searchStr);
+    const resolvedJurisdiction = geo.state;
+    const resolvedMunicipality = geo.municipality;
+
     const { searchSimilarClauses } = require('./embeddingService');
 
     // Build batch items by fetching dynamic laws in parallel for each item (Intra-agent concurrency)
     const items = await Promise.all(
       clauses.map(async (c) => {
-        const retrieved = await retrieveComplianceContext(contract.contractCategory, c.clause_type || 'other', c.rawText);
+        const retrieved = await retrieveComplianceContext(
+            contract.contractCategory, 
+            c.clause_type || 'other', 
+            c.rawText, 
+            resolvedJurisdiction,
+            resolvedMunicipality,
+            enhancedGlobalContext.metadata?.executionDate
+        );
+
+        // Fetch Case Law Precedents via Vector Search
+        const retrievedCaseLawRaw = await retrieveCaseLawPrecedents(c.rawText, 2, 0.50);
+        const retrievedCaseLaw = Array.isArray(retrievedCaseLawRaw) ? retrievedCaseLawRaw.join('\n') : "";
         
         // Zero-Rupee Vector RAG: Fetch related clauses from the same document to maintain context
         const similarClauses = await searchSimilarClauses(contractId, c.rawText, 3);
@@ -647,6 +664,7 @@ async function analyseRisksForContract(contractId) {
           text: c.rawText,
           clause_type: c.clause_type || 'other',
           retrieved_legal_context: retrieved,
+          retrieved_case_law: retrievedCaseLaw,
           retrieved_contract_context,
         };
       })

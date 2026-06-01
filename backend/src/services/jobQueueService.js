@@ -50,9 +50,23 @@ async function processContractJob(contractId) {
   console.log(`🚀 [Queue Worker] Starting analysis workflow for contract: ${contractId}`);
   
   try {
-    // 1. Initial State
-    await updateJobProgress(contractId, 5, 'Initializing agents and extracting global context');
-    await extractGlobalContextForContract(contractId);
+    // 1. Initial State (Metadata Pre-Flight & Graph RAG Symbol Table)
+    await updateJobProgress(contractId, 5, 'Initializing agents, extracting context, and building Graph RAG Symbol Table');
+    const { buildGlobalSymbolTable } = require('./agent0SymbolTable');
+    
+    // Run Pre-Flight and Agent 0 concurrently
+    const [globalContextRes, symbolTable] = await Promise.all([
+      extractGlobalContextForContract(contractId),
+      (async () => {
+        const contract = await Contract.findById(contractId);
+        return await buildGlobalSymbolTable(contract.rawText);
+      })()
+    ]);
+
+    // Store the global symbol table into the contract's global context for downstream agents
+    await Contract.findByIdAndUpdate(contractId, {
+      $set: { 'globalContext.symbolTable': symbolTable }
+    });
 
     // 2. Run Agent 1 (Clause Extraction/Classification) and Embeddings (for RAG)
     await updateJobProgress(contractId, 20, 'Classifying clauses and building RAG index');
@@ -63,8 +77,6 @@ async function processContractJob(contractId) {
         console.error(`⚠️  Non-fatal: Clause embedding failed, skipping RAG index creation: ${err.message}`);
       })
     ]);
-
-    // 3. Run Agent 2 (Risk Analysis), Financial Analyst, and Lifecycle Extractor concurrently
     await updateJobProgress(contractId, 45, 'Analyzing risks and extracting metadata');
     await Promise.all([
       analyseRisksForContract(contractId),

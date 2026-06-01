@@ -6,7 +6,7 @@ const Clause = require('../models/Clause');
 
 class EmbeddingService {
   constructor() {
-    this.modelName = 'Xenova/nomic-embed-text-v1'; 
+    this.modelName = 'Xenova/bge-m3'; 
     this.extractor = null;
   }
 
@@ -19,9 +19,8 @@ class EmbeddingService {
   async generateEmbedding(text, taskType = 'search_document') {
     await this.init();
     
-    // Nomic architecture highly recommends prefixes for optimal vector alignment
-    const prefix = taskType === 'search_query' ? 'search_query: ' : 'search_document: ';
-    const cleanText = prefix + text.replace(/\s+/g, ' ').trim();
+    // BGE-m3 does not require prefixes. Just clean the text.
+    const cleanText = text.replace(/\s+/g, ' ').trim();
     
     // Process through transformers.js pipeline
     const output = await this.extractor(cleanText, {

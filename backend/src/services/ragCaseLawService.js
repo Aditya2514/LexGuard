@@ -15,15 +15,6 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-/**
- * Searches the Case Law database for the most relevant precedents based on the query text.
- * Uses native in-memory cosine similarity against the 384-dimensional embeddings.
- * 
- * @param {string} queryText - The contract clause or query string
- * @param {number} topK - Number of results to return
- * @param {number} threshold - Minimum cosine similarity threshold (e.g. 0.5)
- * @returns {Promise<Array>} - Array of matching case law documents
- */
 async function retrieveCaseLawPrecedents(queryText, topK = 3, threshold = 0.5) {
   try {
     // 1. Embed the query text
@@ -33,25 +24,39 @@ async function retrieveCaseLawPrecedents(queryText, topK = 3, threshold = 0.5) {
         return [];
     }
 
-    // 2. Fetch all case law embeddings from MongoDB into memory
-    // (This is blazing fast for < 10,000 cases. For millions, switch to Atlas Vector Search)
-    const cases = await CaseLaw.find({ embedding: { $ne: null, $not: { $size: 0 } } }).lean();
-
-    // 3. Compute cosine similarity for each case
-    const scoredCases = [];
-    for (const caseDoc of cases) {
-        const score = cosineSimilarity(queryVector, caseDoc.embedding);
-        if (score >= threshold) {
-            scoredCases.push({
-                ...caseDoc,
-                score
-            });
+    // 2. Execute Native Atlas Vector Search
+    const statutoryMatches = await CaseLaw.aggregate([
+      {
+        $vectorSearch: {
+          index: "lexguard_caselaw_vector_index", // The Atlas index the user is creating
+          path: "embedding",
+          queryVector: queryVector,
+          numCandidates: 100,
+          limit: 10
         }
-    }
+      },
+      {
+        $project: {
+          case_title: 1,
+          citation: 1,
+          legal_domain: 1,
+          summary: 1,
+          similarityScore: { $meta: "vectorSearchScore" }
+        }
+      }
+    ]);
 
-    // 4. Sort and return top K
-    scoredCases.sort((a, b) => b.score - a.score);
-    return scoredCases.slice(0, topK);
+    // 3. Filter by threshold and take top K
+    const relevantMatches = statutoryMatches
+        .filter(match => match.similarityScore >= threshold)
+        .slice(0, topK);
+
+    if (relevantMatches.length === 0) return [];
+
+    // 4. Format results into structured prompt blocks
+    return relevantMatches.map(doc => (
+      `\n\n=== SUPREME COURT PRECEDENT ===\nCase: ${doc.case_title} [${doc.citation}]\nHolding: ${doc.summary}\n=================================\n`
+    ));
 
   } catch (error) {
     console.error(`🚨 [Case Law RAG Failure]:`, error.message);
