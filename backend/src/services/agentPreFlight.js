@@ -24,14 +24,8 @@ Required Schema:
     "employeeDesignation": "String",
     "employeeAddress": "String (The physical city/state/country of the employee)",
     "companyAddress": "String (The physical city/state/country of the company)"
-  },
-  "globalDefinitions": {
-    "ACTUAL_DEFINED_TERM_1": "Precise structural definition of ACTUAL_DEFINED_TERM_1 as written in the contract",
-    "ACTUAL_DEFINED_TERM_2": "Precise structural definition of ACTUAL_DEFINED_TERM_2 as written in the contract"
   }
 }
-
-Under 'globalDefinitions', map each actual defined term name (e.g., 'ProprietaryInformation', 'OperationalDeficitEvent', 'IntellectualProperty') dynamically as a unique key, and assign its exact textual definition as its string value. Do NOT use the placeholder string 'keyTermName' as a key; instead, generate the key names dynamically based on the terms defined in the contract.
 `;
 
 /**
@@ -41,7 +35,7 @@ Under 'globalDefinitions', map each actual defined term name (e.g., 'Proprietary
  * @returns {Promise<object>}
  */
 async function runAgentPreFlight(rawText) {
-  // Extract initial slice (first 20,000 characters) where recitals and definitions live
+  // Extract initial slice (first 20,000 characters) where recitals live
   const sampleText = (rawText || '').substring(0, 20000).trim();
 
   // If the contract is completely blank, return empty structured fallback
@@ -53,8 +47,7 @@ async function runAgentPreFlight(rawText) {
         employeeDesignation: null,
         employeeAddress: null,
         companyAddress: null,
-      },
-      globalDefinitions: {},
+      }
     };
   }
 
@@ -64,7 +57,7 @@ async function runAgentPreFlight(rawText) {
       userContent: sampleText,
       jsonMode: true,
       temperature: 0.1,
-      maxTokens: 1500,
+      maxTokens: 1000,
     });
 
     // Tail scan for governing law if missing
@@ -76,7 +69,7 @@ async function runAgentPreFlight(rawText) {
           userContent: tailText,
           jsonMode: true,
           temperature: 0.1,
-          maxTokens: 1500,
+          maxTokens: 1000,
         });
         if (tailResp?.metadata?.governingLaw) {
           if (!resp.metadata) resp.metadata = {};
@@ -95,8 +88,7 @@ async function runAgentPreFlight(rawText) {
         employeeDesignation: resp?.metadata?.employeeDesignation || null,
         employeeAddress: resp?.metadata?.employeeAddress || null,
         companyAddress: resp?.metadata?.companyAddress || null,
-      },
-      globalDefinitions: resp?.globalDefinitions || {},
+      }
     };
   } catch (err) {
     console.error('⚠️  Pre-Flight LLM extraction failed. Returning safe defaults.', err.message);
@@ -108,8 +100,7 @@ async function runAgentPreFlight(rawText) {
         employeeDesignation: null,
         employeeAddress: null,
         companyAddress: null,
-      },
-      globalDefinitions: {},
+      }
     };
   }
 }

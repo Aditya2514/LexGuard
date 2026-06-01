@@ -60,6 +60,68 @@ async function detectSemanticTraps(text) {
     return [];
 }
 
+const { generateEmbedding } = require('./embeddingService');
+const PredatoryTrap = require('../models/PredatoryTrap');
+
+function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function detectVectorAndSemanticTraps(text) {
+    if (!text || text.length < 50) return [];
+
+    try {
+        // Step 1: Generate Embedding
+        const clauseVector = await generateEmbedding(text, 'search_query');
+        if (!clauseVector || clauseVector.length === 0) return [];
+
+        // Step 2: Fetch traps from DB
+        const traps = await PredatoryTrap.find({}).lean();
+        
+        let highestScore = 0;
+        let bestMatch = null;
+
+        for (const trap of traps) {
+            if (!trap.embedding) continue;
+            const score = cosineSimilarity(clauseVector, trap.embedding);
+            if (score > highestScore) {
+                highestScore = score;
+                bestMatch = trap;
+            }
+        }
+
+        // Layer 2: Vector Fingerprinting (Red Zone)
+        if (highestScore >= 0.88 && bestMatch) {
+            return [{
+                type: bestMatch.trap_type,
+                severity: bestMatch.severity,
+                reasoning: `Matched known predatory trap vector (Cosine Similarity: ${highestScore.toFixed(3)}).`
+            }];
+        }
+
+        // Layer 3: Gated LLM Fallback (Yellow Zone)
+        if (highestScore >= 0.75 && highestScore < 0.88) {
+            console.log(`🟡 Clause in Yellow Zone (Cosine ${highestScore.toFixed(3)}). Triggering Agent 4 Semantic Fallback...`);
+            return await detectSemanticTraps(text);
+        }
+
+        // Green Zone
+        return [];
+    } catch (e) {
+        console.error('⚠️ [Vector Trap Detector] Failed:', e.message);
+        return [];
+    }
+}
+
 function detectPredatoryTraps(text) {
     if (!text || text.length < 50) return [];
     
@@ -458,5 +520,5 @@ function detectPredatoryTraps(text) {
     return detectedTraps;
 }
 
-module.exports = { detectPredatoryTraps, detectSemanticTraps };
+module.exports = { detectPredatoryTraps, detectSemanticTraps, detectVectorAndSemanticTraps };
 

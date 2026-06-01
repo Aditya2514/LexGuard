@@ -72,6 +72,11 @@ async function runComplianceCheckForContract(contractId) {
 
         console.log(`\n[Agent 4] Evaluating Dynamic Compliance for contract: ${contractId} (${clauses.length} clauses)`);
 
+        const { resolveJurisdiction } = require('../utils/geoMapper');
+        const enhancedGlobalContext = contract.globalContext || {};
+        const searchStr = ((enhancedGlobalContext.metadata?.governingLaw || "") + " " + (enhancedGlobalContext.metadata?.jurisdiction || ""));
+        const geo = resolveJurisdiction(searchStr);
+
         for (const c of clauses) {
             const isRisky = c.risk_level === 'medium' || c.risk_level === 'high' || c.risk_level === 'critical';
             const shouldScan = isRisky || process.env.FULL_COMPLIANCE_SCAN === 'true';
@@ -81,7 +86,10 @@ async function runComplianceCheckForContract(contractId) {
                 const statutoryContext = await retrieveComplianceContext(
                     contract.contractCategory || "General",
                     c.clause_type || "other",
-                    c.rawText
+                    c.rawText,
+                    geo.state,
+                    geo.municipality,
+                    enhancedGlobalContext.metadata?.executionDate
                 );
 
                 const result = await runAgent4ComplianceChecker(c.rawText, statutoryContext);

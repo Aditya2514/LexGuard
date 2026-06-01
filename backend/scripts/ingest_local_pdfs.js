@@ -6,7 +6,7 @@ const pdfParse = require('pdf-parse');
 const StatuteNode = require('../src/models/StatuteNode');
 const { generateLocalEmbedding } = require('./localEmbeddingService');
 
-const PDF_DIRECTORY = path.join(__dirname, '../data/bare_acts');
+const PDF_DIRECTORY = path.join(__dirname, '../data/pdfs');
 const BATCH_SIZE = 5;
 const DELAY_MS = 1000;
 

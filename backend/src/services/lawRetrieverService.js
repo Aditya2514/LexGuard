@@ -6,7 +6,7 @@ const StatuteNode = require('../models/StatuteNode');
 /**
  * Dynamically retrieves relevant Indian Statutory Sections based on contract ontology and semantics
  */
-async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central", executionDate = null) {
+async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central", municipality = null, executionDate = null) {
   try {
     // 1. Fetch the exact statutory routing domains for this specific intersection
     const mapping = await LegalDomainMap.findOne({ contractType, clauseType });
@@ -39,7 +39,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
 
     console.log(`⚖️ [Ontology Router] Mapping [${contractType} ➔ ${clauseType}] to Domains:`, activeDomains);
 
-    // 2. Generate the 768-dimensional dense vector for the target clause wording
+    // 2. Generate the 1024-dimensional dense vector for the target clause wording
     const queryVector = await generateEmbedding(clauseText, 'search_query');
 
     // 3. Use the imported StatuteNode model (avoids OverwriteModelError on concurrent calls)
@@ -47,7 +47,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
     // Build filter based on executionDate
     const vectorFilter = {
         domain: { $in: activeDomains },
-        jurisdiction: { $in: ["Central", jurisdiction] }
+        jurisdiction: { $in: ["Central", jurisdiction, municipality].filter(Boolean) }
     };
     
     // If contract was executed before July 1, 2024, don't filter out repealed laws (IPC/CrPC still apply)

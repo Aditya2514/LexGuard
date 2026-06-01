@@ -101,7 +101,16 @@ router.post(
       req.file.filename = filename;
 
       // 1. Extract and clean text from the uploaded file
-      const cleanedText = await extractText(req.file.id, req.file.originalname);
+      let cleanedText = await extractText(req.file.id, req.file.originalname);
+
+      // (NEW) Phase 7: Conditional OCR Intercept
+      // Strip whitespace to accurately measure valid text content
+      const validTextDensity = cleanedText.replace(/\s+/g, '').length;
+      if (validTextDensity < 50) {
+          console.warn('⚠️ Scanned Document Detected: Triggering OCR Fallback Pipeline');
+          const OCRService = require('../services/ocrService');
+          cleanedText = await OCRService.processPDFBuffer(req.file.buffer);
+      }
 
       // 2. Split cleaned text into clause segments (heuristic, no AI)
       const clauseSegments = splitClauses(cleanedText);
