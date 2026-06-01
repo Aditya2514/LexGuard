@@ -6,6 +6,7 @@ FROM node:20-slim
 # poppler-utils: pdftoppm to convert PDF pages to images for OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
+    tesseract-ocr-eng \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
