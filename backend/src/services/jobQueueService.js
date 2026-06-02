@@ -49,6 +49,10 @@ async function updateJobProgress(contractId, progress, step, status = 'processin
 async function processContractJob(contractId) {
   console.log(`🚀 [Queue Worker] Starting analysis workflow for contract: ${contractId}`);
   
+  const { loggerManager } = require('./executionLogger');
+  const logger = loggerManager.createLogger(contractId);
+  logger.logAgentStep('SystemInitialization', 0, 0);
+
   try {
     // 1. Initial State (Metadata Pre-Flight & Graph RAG Symbol Table)
     await updateJobProgress(contractId, 5, 'Initializing agents, extracting context, and building Graph RAG Symbol Table');
@@ -136,6 +140,10 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 100, 'Analysis complete', 'completed');
     console.log(`🎉 [Queue Worker] Successfully processed contract: ${contractId}`);
 
+    logger.logAgentStep('SystemCompletion', 0, 0);
+    await logger.finalize();
+    loggerManager.removeLogger(contractId);
+
     // Asynchronously launch Agent 6 (Adversary Red-Teaming) in the background.
     // This does not block the UI or the job queue completion status.
     runAdversaryRedTeamForContract(contractId).catch(err => {
@@ -147,6 +155,11 @@ async function processContractJob(contractId) {
 
   } catch (err) {
     console.error(`❌ [Queue Worker] Fatal error processing contract ${contractId}:`, err.message);
+    
+    // Log failure in trace
+    logger.logAgentStep(`SystemError: ${err.message}`, 0, 0);
+    await logger.finalize();
+    loggerManager.removeLogger(contractId);
     
     // Set Job and Contract to failed states
     await updateJobProgress(contractId, 100, 'Analysis failed', 'failed', err.message);
