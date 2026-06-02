@@ -2,7 +2,7 @@ require('dotenv').config({ path: '../.env' });
 const mongoose = require('mongoose');
 const Contract = require('../src/models/Contract');
 const Clause = require('../src/models/Clause');
-const { processContractJob } = require('../src/services/jobQueueService');
+const { processContractJob, awaitShutdown } = require('../src/services/jobQueueService');
 
 async function runMasterTest() {
     await mongoose.connect(process.env.MONGODB_URI);
@@ -93,6 +93,7 @@ IN WITNESS WHEREOF, the parties have signed this Agreement.
         }
     }
 
+    await awaitShutdown(); // Let Agent 6 finish gracefully
     await mongoose.disconnect();
 }
 runMasterTest().catch(console.error);

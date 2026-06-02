@@ -12,7 +12,12 @@ if (process.env.NODE_ENV !== 'test') {
     url: redisUrl,
     socket: {
       connectTimeout: 3000,
-      reconnectStrategy: (retries) => {
+      reconnectStrategy: (retries, cause) => {
+        if (cause && (cause.message.includes('ENOTFOUND') || cause.message.includes('ECONNREFUSED'))) {
+          console.warn('⚠️  Redis Fast-Fail: DNS or Network is unreachable. Gracefully falling back to MongoDB immediately.');
+          isRedisAvailable = false;
+          return false; // Stop reconnecting immediately
+        }
         if (retries > 5) {
           console.warn('⚠️  Redis reconnection retries exceeded limit. Gracefully falling back to MongoDB-only queue.');
           isRedisAvailable = false;
