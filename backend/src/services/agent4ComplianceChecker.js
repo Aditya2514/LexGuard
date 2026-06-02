@@ -62,7 +62,7 @@ ${statutoryContext}
 // Keep the bulk orchestrator wrapper so jobQueueService doesn't break
 const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
-const { retrieveComplianceContext } = require('./lawRetrieverService');
+const graphRagService = require('./graphRagService');
 
 async function runComplianceCheckForContract(contractId) {
     try {
@@ -82,8 +82,8 @@ async function runComplianceCheckForContract(contractId) {
             const shouldScan = isRisky || process.env.FULL_COMPLIANCE_SCAN === 'true';
             
             if (shouldScan) {
-                // Fetch dynamic context
-                const statutoryContext = await retrieveComplianceContext(
+                // Fetch dynamic context via Neo4j GraphRAG
+                const statutoryContext = await graphRagService.retrieveAugmentedContext(
                     contract.contractCategory || "General",
                     c.clause_type || "other",
                     c.rawText,
