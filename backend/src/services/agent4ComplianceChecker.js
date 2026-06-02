@@ -82,6 +82,10 @@ async function runComplianceCheckForContract(contractId) {
             const shouldScan = isRisky || process.env.FULL_COMPLIANCE_SCAN === 'true';
             
             if (shouldScan) {
+                // Retrieve logger for Phase 20 tracing
+                const { loggerManager } = require('./executionLogger');
+                const logger = loggerManager.getLogger(contractId);
+
                 // Fetch dynamic context via Neo4j GraphRAG
                 const statutoryContext = await graphRagService.retrieveAugmentedContext(
                     contract.contractCategory || "General",
@@ -89,7 +93,8 @@ async function runComplianceCheckForContract(contractId) {
                     c.rawText,
                     geo.state,
                     geo.municipality,
-                    enhancedGlobalContext.metadata?.executionDate
+                    enhancedGlobalContext.metadata?.executionDate,
+                    logger
                 );
 
                 const result = await runAgent4ComplianceChecker(c.rawText, statutoryContext);

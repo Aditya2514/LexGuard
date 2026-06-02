@@ -3,9 +3,15 @@ const lawRetrieverService = require('./lawRetrieverService');
 
 class GraphRagService {
   /**
-   * Retrieves compliance context augmented by the Neo4j Knowledge Graph.
+   * Sanitizes alphanumeric codes to completely nuke Cypher injection vectors
    */
-  async retrieveAugmentedContext(contractCategory, clauseType, clauseText, jurisdiction, municipality = '', executionDate = null) {
+  sanitizeIdentifier(input) {
+    if (typeof input !== 'string') return '';
+    // Retain clean section labels and numbers (e.g., "27", "Exception 1", "ICA")
+    return input.replace(/[^a-zA-Z0-9\s-_]/g, '').trim();
+  }
+
+  async retrieveAugmentedContext(contractCategory, clauseType, clauseText, jurisdiction, municipality = '', executionDate = null, logger = null) {
     // Step 1: Use the existing high-accuracy Vector Search to find the primary entry point
     const vectorHits = await lawRetrieverService.retrieveComplianceContext(
         contractCategory,
@@ -26,7 +32,10 @@ class GraphRagService {
     let match;
     const targets = [];
     while ((match = regex.exec(vectorHits)) !== null) {
-      targets.push({ act: match[1].trim(), section: match[2].trim() });
+      targets.push({ 
+        act: this.sanitizeIdentifier(match[1]), 
+        section: this.sanitizeIdentifier(match[2]) 
+      });
     }
 
     if (targets.length === 0) return vectorHits;
@@ -42,35 +51,63 @@ class GraphRagService {
           collect(DISTINCT { type: type(r2), caseName: precedent.caseName, citation: precedent.citation }) AS precedents
       `;
 
-      try {
-        const result = await graphDriver.read(cypherQuery, { act: target.act, section: target.section });
-        if (result.records.length > 0) {
-            const record = result.records[0];
-            const dependencies = record.get('dependencies') || [];
-            const precedents = record.get('precedents') || [];
+      let retries = 2;
+      let delay = 300; // ms
+      let success = false;
 
-            if (dependencies.length > 0) {
-               augmentedContextStr += `[Structural Dependencies for ${target.section}]:\n`;
-               for (const d of dependencies) {
-                  if (d.act) {
-                     augmentedContextStr += `> ${d.type} -> ${d.act}, ${d.section}\n`;
-                  }
-               }
-               augmentedContextStr += `\n`;
-            }
+      while (retries >= 0 && !success) {
+        try {
+          const result = await graphDriver.read(cypherQuery, { act: target.act, section: target.section });
+          
+          if (logger) {
+            const edgeCount = (result.records[0]?.get('dependencies')?.length || 0) + 
+                              (result.records[0]?.get('precedents')?.length || 0);
+            logger.logGraphTraversal(edgeCount, false);
+          }
 
-            if (precedents.length > 0) {
-               augmentedContextStr += `[Binding Precedents for ${target.section}]:\n`;
-               for (const p of precedents) {
-                  if (p.caseName) {
-                     augmentedContextStr += `> ${p.caseName} (${p.citation})\n`;
-                  }
-               }
-               augmentedContextStr += `\n`;
-            }
+          if (result.records.length > 0) {
+              const record = result.records[0];
+              const dependencies = record.get('dependencies') || [];
+              const precedents = record.get('precedents') || [];
+
+              if (dependencies.length > 0) {
+                 augmentedContextStr += `[Structural Dependencies for ${target.section}]:\n`;
+                 for (const d of dependencies) {
+                    if (d.act) {
+                       augmentedContextStr += `> ${d.type} -> ${d.act}, ${d.section}\n`;
+                    }
+                 }
+                 augmentedContextStr += `\n`;
+              }
+
+              if (precedents.length > 0) {
+                 augmentedContextStr += `[Binding Precedents for ${target.section}]:\n`;
+                 for (const p of precedents) {
+                    if (p.caseName) {
+                       augmentedContextStr += `> ${p.caseName} (${p.citation})\n`;
+                    }
+                 }
+                 augmentedContextStr += `\n`;
+              }
+          }
+          success = true;
+
+        } catch (error) {
+          console.warn(`⚠️ [GraphRAG] Neo4j error encountered for ${target.act} ${target.section}. Retries remaining: ${retries}. Error: ${error.message}`);
+          
+          if (retries === 0) {
+            console.error("🚨 Circuit Breaker Tripped: Routing directly to Flat Vector Fallback.");
+            if (logger) logger.logGraphTraversal(0, true);
+            
+            // GRACEFUL FALLBACK: Return the standard vector hits unmodified
+            return vectorHits;
+          }
+
+          // Linear backoff delay
+          await new Promise(resolve => setTimeout(resolve, delay));
+          retries--;
+          delay *= 2; 
         }
-      } catch (err) {
-        console.warn(`[GraphRAG] Neo4j traversal failed for ${target.act} ${target.section}: ${err.message}`);
       }
     }
 
