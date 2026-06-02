@@ -431,7 +431,7 @@ async function callLLM({
     providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
     providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
     providers.push({ name: 'groq', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
+    // providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
     providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
 
     // Dynamic Waterfall Sorting based on LLM_PROVIDER
