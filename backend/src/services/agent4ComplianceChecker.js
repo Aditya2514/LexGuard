@@ -47,12 +47,7 @@ ${statutoryContext}
   });
 
   try {
-    let cleanJson = rawJsonOutput;
-    if (typeof rawJsonOutput === 'string') {
-        cleanJson = rawJsonOutput.replace(/```json|```/gi, '').trim();
-        return JSON.parse(cleanJson);
-    }
-    return rawJsonOutput;
+    return typeof rawJsonOutput === 'string' ? JSON.parse(rawJsonOutput) : rawJsonOutput;
   } catch (err) {
     console.error("🚨 Agent 4 JSON normalization parsing failed:", err.message);
     return { isCompliant: true, violationReason: "Bypass triggered due to structural parser serialization error.", statutoryCitations: [] };

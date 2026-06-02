@@ -23,6 +23,9 @@ const QUEUE_NAME = 'lexguard:queue';
 let workerActive = false;
 let workerIntervalId = null;
 
+// Track background promises to prevent orphaned threads during teardown
+const backgroundTasks = new Set();
+
 /**
  * Update both QueueJob progress and metadata step status
  */
@@ -146,9 +149,12 @@ async function processContractJob(contractId) {
 
     // Asynchronously launch Agent 6 (Adversary Red-Teaming) in the background.
     // This does not block the UI or the job queue completion status.
-    runAdversaryRedTeamForContract(contractId).catch(err => {
+    const agent6Promise = runAdversaryRedTeamForContract(contractId).catch(err => {
         console.error(`⚠️ [Agent 6] Background Red-Teaming failed: ${err.message}`);
+    }).finally(() => {
+        backgroundTasks.delete(agent6Promise);
     });
+    backgroundTasks.add(agent6Promise);
 
     // Fire webhook to notify enterprise integrations
     await dispatchWebhooks('contract.analyzed', contractId);
@@ -343,7 +349,18 @@ const jobQueueService = {
   /**
    * Process a single contract job directly (synchronous routing helper)
    */
-  processContractJob: processContractJob
+  processContractJob: processContractJob,
+
+  /**
+   * Await all pending background tasks to ensure safe teardown during tests or process exit
+   */
+  awaitShutdown: async () => {
+    if (backgroundTasks.size > 0) {
+      console.log(`🔌 [Queue Worker] Awaiting ${backgroundTasks.size} background tasks before shutdown...`);
+      await Promise.allSettled(Array.from(backgroundTasks));
+      console.log(`✅ [Queue Worker] All background tasks completed.`);
+    }
+  }
 };
 
 module.exports = jobQueueService;
