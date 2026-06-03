@@ -10,25 +10,25 @@ You must extract two things:
 1. FACTS: The exact numerical, temporal, or logical parameters explicitly written in the contract.
 2. RULES: The logical constraints that must be true for the contract to be mathematically and procedurally sound.
 
-Output Schema:
+Output Schema MUST be valid JSON matching this exact structure:
 {
   "facts": {
     "fact_key_name": {
-      "value": <number, string, or boolean>,
-      "clause": "<Name of the clause or schedule, e.g. 'Clause 4.1'>",
-      "text": "<The exact quote from the text proving this fact>",
-      "confidence": <float 0.0 to 1.0>
+      "value": "actual value (can be number, string, or boolean)",
+      "clause": "Clause 4.1",
+      "text": "Exact quote from the text proving this fact.",
+      "confidence": 0.95
     }
   },
   "rules": [
     {
-      "id": "<snake_case_rule_id>",
-      "type": "<operator>",
-      "left": "<fact_key_name> OR [<array_of_fact_key_names>]",
-      "right": "<fact_key_name> OR [<array_of_fact_key_names>]",
-      "severity": "critical" | "high" | "medium" | "low",
-      "title": "<Short title of the risk if the rule fails>",
-      "reason": "<Detailed explanation of why this contradicts or fails>"
+      "id": "snake_case_rule_id",
+      "type": "operator_name",
+      "left": "fact_key_name",
+      "right": "fact_key_name",
+      "severity": "critical",
+      "title": "Short title of the risk if rule fails",
+      "reason": "Detailed explanation of why this contradicts or fails"
     }
   ]
 }
