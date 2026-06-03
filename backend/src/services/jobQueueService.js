@@ -95,11 +95,13 @@ async function processContractJob(contractId) {
     await updateJobProgress(contractId, 70, 'Generating plain-language guides, auditing cross-references, and checking Indian law');
     
     const { runCrossRefAudit } = require('./agent9CrossRefAuditor');
+    const { runAgent10DeterministicAudit } = require('./agent10DeterministicAuditor');
 
     await Promise.all([
       generateUserAdvocateForContract(contractId),
       runComplianceCheckForContract(contractId),
-      runCrossRefAudit(contractId)
+      runCrossRefAudit(contractId),
+      runAgent10DeterministicAudit(contractId)
     ]);
 
     // 5. Finalize overall contract risk rating
