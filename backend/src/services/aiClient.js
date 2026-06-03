@@ -294,6 +294,59 @@ async function callGroq({
   return { parsed: extractJSON(rawText), tokens: totalTokens, model };
 }
 
+// ── Ollama Local Client ───────────────────────────────────────────────────────
+
+/**
+ * Direct HTTP caller for Local Ollama API.
+ */
+async function callOllama({
+  systemPrompt,
+  userContent,
+  jsonMode,
+  temperature,
+  maxTokens,
+}) {
+  const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434/api/chat';
+  const model = process.env.OLLAMA_MODEL || 'llama3';
+
+  const payload = {
+    model: model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent }
+    ],
+    stream: false,
+    options: {
+      num_ctx: 8192,
+      temperature: temperature ?? 0.1
+    }
+  };
+
+  if (jsonMode) {
+    payload.format = "json";
+  }
+
+  const res = await fetch(ollamaUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Ollama API Error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.message?.content;
+  if (!rawText) {
+    throw new Error('Ollama returned an empty response.');
+  }
+
+  const totalTokens = (data?.prompt_eval_count || 0) + (data?.eval_count || 0);
+  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -360,6 +413,7 @@ async function callLLM({
     const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
     const tryGrok = () => callGrok({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
     const tryHuggingFace = () => callHuggingFace({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
+    const tryOllama = () => callOllama({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
     const tryGemini = async () => {
       const client = getClient();
       let activeModel = AI_MODEL_NAME;
@@ -433,6 +487,7 @@ async function callLLM({
     providers.push({ name: 'groq', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
     // providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
     providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
+    providers.push({ name: 'ollama', fn: tryOllama, available: process.env.OLLAMA_ENABLED === 'true' });
 
     // Dynamic Waterfall Sorting based on LLM_PROVIDER
     providers.sort((a, b) => {
