@@ -1,35 +1,30 @@
 const { callLLM } = require('./aiClient');
 const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
+const vm = require('vm');
 
-const EXTRACTION_PROMPT = `
-You are Agent 10 (The Deterministic Auditor) for LexGuard.
-Your only job is to extract exact numerical, financial, and temporal parameters from the contract.
-DO NOT perform any legal analysis. Do not look for risks.
-If a parameter is not explicitly stated in the contract, set its value to null.
-Extract all milestones as an array of numbers.
-Ensure all outputs strictly adhere to the following JSON schema:
+const DYNAMIC_EXTRACTION_PROMPT = `
+You are Agent 10 (The Deterministic Code Interpreter) for LexGuard.
+Your objective is to catch hard mathematical, financial, and chronological contradictions in the provided contract.
+You must output a strictly formatted JSON object containing two fields:
+1. "extracted_data": A dictionary of all exact numerical, temporal, or financial parameters found in the contract.
+2. "validation_code": A raw JavaScript string defining a function 'validate(data)' that evaluates the 'extracted_data' for logical contradictions.
+
+Requirements for 'validation_code':
+- It must take one argument: 'data' (which corresponds to extracted_data).
+- It must return an array of risk objects: [{ severity: 'critical' | 'high' | 'medium', title: '...', reason: '...' }]
+- You must write pure Javascript (ES6 allowed).
+- Do NOT use markdown code blocks inside the 'validation_code' string. Just raw valid JavaScript text.
+
+Output Schema:
 {
-  "financials": {
-    "total_contract_value": Number | null,
-    "milestones": [Number] // array of milestone amounts
-  },
-  "timelines": {
-    "acceptance_period_days": Number | null,
-    "deemed_acceptance_days": Number | null
-  },
-  "retention": {
-    "general_retention_years": Number | null,
-    "tax_retention_years": Number | null
-  },
-  "notice_periods": {
-    "security_breach_hours": Number | null
-  }
+  "extracted_data": { ... },
+  "validation_code": "function validate(data) { const risks = []; /* your logic */ return risks; }"
 }
 `;
 
 async function runAgent10DeterministicAudit(contractId) {
-    console.log(`[Agent 10] Starting Deterministic Audit for contract: ${contractId}`);
+    console.log(`[Agent 10] Starting Dynamic Code Interpreter for contract: ${contractId}`);
 
     const contract = await Contract.findById(contractId);
     if (!contract) throw new Error('Contract not found');
@@ -37,25 +32,22 @@ async function runAgent10DeterministicAudit(contractId) {
     const clauses = await Clause.find({ contractId }).sort('segmentIndex');
     const fullText = clauses.map(c => c.rawText).join('\n\n');
 
-    // Step 1: LLM Extraction Pass
+    // Step 1: LLM Dynamic Code Generation Pass
     const llmResult = await callLLM({
-        systemPrompt: EXTRACTION_PROMPT,
+        systemPrompt: DYNAMIC_EXTRACTION_PROMPT,
         userContent: JSON.stringify({ contractText: fullText }),
         jsonMode: true,
-        temperature: 0.0, // Absolute zero for deterministic extraction
-        maxTokens: 2000
+        temperature: 0.1, 
+        maxTokens: 4000
     });
 
     const data = llmResult.parsed;
     let newRisksCount = 0;
 
-    // Helper to push a deterministic risk to the database
     const pushRisk = async (severity, reason, title) => {
-        // We will create a special 'Global' clause for document-wide deterministic risks, 
-        // or append it to the contract itself. For now, let's create a synthesized Clause record.
         const newRisk = new Clause({
             contractId,
-            segmentIndex: 9999 + newRisksCount, // Put at the end
+            segmentIndex: 9999 + newRisksCount,
             rawText: `[DETERMINISTIC VALIDATION FAILURE] ${title}`,
             analysis_status: 'completed',
             risk_level: severity,
@@ -65,70 +57,44 @@ async function runAgent10DeterministicAudit(contractId) {
         });
         await newRisk.save();
         newRisksCount++;
-        console.log(`🚨 [Agent 10] Deterministic Risk Found: ${title}`);
+        console.log(`🚨 [Agent 10] Dynamic Risk Found: ${title}`);
     };
 
-    // Step 2: Native JS Validation Pass
-    
-    // Rule 1: Financial Math Check
-    if (data?.financials) {
-        const total = data.financials.total_contract_value;
-        const milestones = data.financials.milestones || [];
-        if (typeof total === 'number' && milestones.length > 0) {
-            const sum = milestones.reduce((a, b) => a + b, 0);
-            if (sum !== total) {
-                await pushRisk(
-                    'critical', 
-                    `Mathematical contradiction: Milestones sum to $${sum} but the stated total contract value is $${total}.`,
-                    'Financial Milestone Discrepancy'
-                );
+    // Step 2: Sandboxed Node.js VM Execution
+    if (data?.validation_code && data?.extracted_data) {
+        try {
+            console.log(`[Agent 10] Executing dynamic validation script in sandbox...`);
+            // Wrap the function in an IIFE to execute it immediately with the extracted data
+            const scriptStr = `
+                (${data.validation_code})(${JSON.stringify(data.extracted_data)});
+            `;
+            
+            const script = new vm.Script(scriptStr);
+            // Create an empty context to prevent access to Node internals
+            const context = vm.createContext({});
+            
+            // Execute the script with a 2-second timeout to prevent infinite loops
+            const generatedRisks = script.runInContext(context, { timeout: 2000 });
+            
+            if (Array.isArray(generatedRisks)) {
+                for (const risk of generatedRisks) {
+                    await pushRisk(
+                        risk.severity || 'high',
+                        risk.reason || 'Dynamic deterministic constraint violation detected.',
+                        risk.title || 'Validation Logic Error'
+                    );
+                }
+            } else {
+                console.warn(`[Agent 10] Validation script returned non-array result:`, generatedRisks);
             }
+        } catch (err) {
+            console.error(`⚠️ [Agent 10] Dynamic VM Execution Failed: ${err.message}`);
         }
+    } else {
+        console.warn(`[Agent 10] LLM did not return proper validation_code or extracted_data fields.`);
     }
 
-    // Rule 2: Acceptance Logic Check
-    if (data?.timelines) {
-        const review = data.timelines.acceptance_period_days;
-        const deemed = data.timelines.deemed_acceptance_days;
-        if (typeof review === 'number' && typeof deemed === 'number') {
-            if (deemed < review) {
-                await pushRisk(
-                    'high',
-                    `Timeline contradiction: Deemed acceptance triggers in ${deemed} days, but the client has ${review} days to review the deliverable.`,
-                    'Deemed Acceptance Precedence Issue'
-                );
-            }
-        }
-    }
-
-    // Rule 3: Retention Conflicts
-    if (data?.retention) {
-        const gen = data.retention.general_retention_years;
-        const tax = data.retention.tax_retention_years;
-        if (typeof gen === 'number' && typeof tax === 'number') {
-            if (tax > gen) {
-                await pushRisk(
-                    'medium',
-                    `Retention conflict: General record retention is ${gen} years, but tax record retention is ${tax} years, creating a data-handling contradiction.`,
-                    'Conflicting Retention Periods'
-                );
-            }
-        }
-    }
-
-    // Rule 4: Security Notice Constraints
-    if (data?.notice_periods) {
-        const sec = data.notice_periods.security_breach_hours;
-        if (typeof sec === 'number' && sec < 48) {
-            await pushRisk(
-                'high',
-                `Aggressive Security SLA: The contract mandates a security breach notification within ${sec} hours, which may be operationally impossible and violates typical 72-hour GDPR baselines.`,
-                'Impossible Security Notice SLA'
-            );
-        }
-    }
-
-    console.log(`✅ [Agent 10] Deterministic Audit completed. Found ${newRisksCount} hardcoded errors.`);
+    console.log(`✅ [Agent 10] Dynamic Audit completed. Found ${newRisksCount} contradictions.`);
 }
 
 module.exports = { runAgent10DeterministicAudit };
