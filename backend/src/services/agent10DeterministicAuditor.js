@@ -1,195 +1,247 @@
+/**
+ * Agent 10: Deterministic Auditor (Rebuilt — Phase 26)
+ * 
+ * Three-layer architecture:
+ *   Layer 1: Deterministic Fact Extraction + Canonicalization (zero LLM)
+ *   Layer 2: Deterministic Contradiction Rules (zero LLM)
+ *   Layer 3: Semantic Contradiction Detection (zero LLM pattern matching)
+ *   Bonus:   Optional LLM enhancement pass (if provider available)
+ * 
+ * This agent produces results even when ALL LLM providers are rate-limited.
+ */
+
 const { callLLM } = require('./aiClient');
 const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
+const { extractFactTable } = require('./deterministicFactExtractor');
+const { detectContradictions } = require('./crossClauseContradictionEngine');
 
-const DYNAMIC_EXTRACTION_PROMPT = `
-You are Agent 10 (The Deterministic Evaluator) for LexGuard.
-Your objective is to map out the financial, chronological, and structural dependencies of this contract and output them as a strict JSON DSL (Domain Specific Language).
+// ── Optional LLM DSL Prompt (Phase 4 — supplementary, not primary) ────────
+const DSL_EXTRACTION_PROMPT = `
+You are Agent 10 (The Deterministic Code Interpreter) for LexGuard.
+Your objective is to catch hard mathematical, financial, and chronological contradictions in the provided contract.
+Extract rules in a strict JSON Domain Specific Language (DSL).
 
-You must extract two things:
-1. FACTS: The exact numerical, temporal, or logical parameters explicitly written in the contract.
-2. RULES: The logical constraints that must be true for the contract to be mathematically and procedurally sound.
-
-Output Schema MUST be valid JSON matching this exact structure:
+Output Schema:
 {
-  "facts": {
-    "fact_key_name": {
-      "value": "actual value (can be number, string, or boolean)",
-      "clause": "Clause 4.1",
-      "text": "Exact quote from the text proving this fact.",
-      "confidence": 0.95
-    }
-  },
   "rules": [
     {
-      "id": "snake_case_rule_id",
-      "type": "operator_name",
-      "left": "fact_key_name",
-      "right": "fact_key_name",
-      "severity": "critical",
-      "title": "Short title of the risk if rule fails",
-      "reason": "Detailed explanation of why this contradicts or fails"
+      "type": "sum_equals" | "multiply_equals" | "less_than_or_equal" | "greater_than" | "timeline_conflict",
+      "leftFact": { "label": "description", "value": <Array of Numbers or single Number> },
+      "rightFact": { "label": "description", "value": <Number> },
+      "title": "Short title of the rule being checked",
+      "severity": "critical" | "high" | "medium",
+      "reason": "Explanation of the contradiction if this rule is violated."
     }
   ]
 }
 
-Supported Rule Types (Operators):
-- "sum_equals": The sum of 'left' facts must equal the sum of 'right' facts.
-- "equals": 'left' must strictly equal 'right'.
-- "greater_than": 'left' must be greater than 'right'.
-- "less_than": 'left' must be less than 'right'.
-- "date_before": 'left' date must occur before 'right' date.
-- "date_after": 'left' date must occur after 'right' date.
-- "all_equal": All facts listed in 'left' array must have the exact same value.
-- "exists": The fact in 'left' must exist in the document.
-- "not_exists": The fact in 'left' must NOT exist in the document.
-
-CRITICAL INSTRUCTIONS:
-- You do NOT execute the rules. You ONLY define them.
-- If a rule evaluates to FALSE, our deterministic engine will flag it as a risk. Therefore, write rules representing the REQUIRED COMPLIANT STATE.
-- Only extract facts you are highly confident about. Set confidence strictly.
-- Ensure 'left' and 'right' keys exactly match the keys you define in the 'facts' dictionary.
+Return ONLY valid JSON. NO EXPRESSIONS — only literal Numbers or Arrays of Numbers.
 `;
 
-function evaluateRule(rule, facts) {
-    const getValues = (keyOrKeys) => {
-        if (!keyOrKeys) return [];
-        if (Array.isArray(keyOrKeys)) return keyOrKeys.map(k => facts[k]).filter(f => f && f.confidence > 0.5);
-        const f = facts[keyOrKeys];
-        return (f && f.confidence > 0.5) ? [f] : [];
-    };
-
-    const leftFacts = getValues(rule.left);
-    const rightFacts = getValues(rule.right);
-    const allFacts = [...leftFacts, ...rightFacts];
-
-    // If facts required for evaluation are missing, we cannot evaluate deterministically
-    if (rule.type !== 'exists' && rule.type !== 'not_exists') {
-        if (leftFacts.length === 0) return null; 
-    }
-
-    let passed = true;
-    const leftVals = leftFacts.map(f => f.value);
-    const rightVals = rightFacts.map(f => f.value);
-
-    switch(rule.type) {
-        case 'sum_equals':
-            const sumL = leftVals.reduce((a,b)=>a+b, 0);
-            const sumR = rightVals.reduce((a,b)=>a+b, 0);
-            passed = (sumL === sumR);
-            break;
-        case 'greater_than':
-            passed = leftVals[0] > rightVals[0];
-            break;
-        case 'less_than':
-            passed = leftVals[0] < rightVals[0];
-            break;
-        case 'equals':
-            passed = leftVals[0] === rightVals[0];
-            break;
-        case 'all_equal':
-            passed = leftVals.every(v => v === leftVals[0]);
-            break;
-        case 'date_before':
-            passed = new Date(leftVals[0]) < new Date(rightVals[0]);
-            break;
-        case 'date_after':
-            passed = new Date(leftVals[0]) > new Date(rightVals[0]);
-            break;
-        case 'exists':
-            passed = leftFacts.length > 0;
-            break;
-        case 'not_exists':
-            passed = leftFacts.length === 0;
-            break;
-        default:
-            passed = true;
-    }
-
-    if (!passed) {
-        const evidenceLines = [];
-        allFacts.forEach(f => {
-            if (f.clause && f.text) {
-                evidenceLines.push(`${f.clause}: "${f.text}"`);
-            }
-        });
-
-        // Deduplicate evidence lines
-        const uniqueEvidence = [...new Set(evidenceLines)];
-        
-        return {
-            id: rule.id || 'rule_violation',
-            severity: rule.severity || 'high',
-            title: rule.title,
-            reason: rule.reason,
-            evidence: uniqueEvidence
-        };
-    }
-    return null;
-}
-
+/**
+ * Main entry point for Agent 10.
+ * @param {string} contractId 
+ */
 async function runAgent10DeterministicAudit(contractId) {
-    console.log(`[Agent 10] Starting Deterministic Rule Engine for contract: ${contractId}`);
+    console.log(`[Agent 10] Starting Three-Layer Deterministic Auditor for contract: ${contractId}`);
 
     const contract = await Contract.findById(contractId);
     if (!contract) throw new Error('Contract not found');
 
+    // Delete any existing virtual clauses from previous runs of Agent 10
+    await Clause.deleteMany({ contractId, segmentIndex: { $gte: 9999 } });
+
     const clauses = await Clause.find({ contractId }).sort('segmentIndex');
-    const fullText = clauses.map(c => c.rawText).join('\n\n');
-
-    // Step 1: LLM Fact & Dependency Extraction
-    const llmResult = await callLLM({
-        systemPrompt: DYNAMIC_EXTRACTION_PROMPT,
-        userContent: JSON.stringify({ contractText: fullText }),
-        jsonMode: true,
-        temperature: 0.1, 
-        maxTokens: 4000
-    });
-
-    const data = llmResult.parsed || {};
-    const facts = data.facts || {};
-    const rules = data.rules || [];
-    
-    let newRisksCount = 0;
-
-    const pushRisk = async (finding) => {
-        const fullReason = finding.evidence && finding.evidence.length > 0 
-            ? `${finding.reason}\n\nEvidence:\n- ${finding.evidence.join('\n- ')}` 
-            : finding.reason;
-
-        const newRisk = new Clause({
-            contractId,
-            segmentIndex: 9999 + newRisksCount,
-            rawText: `[DETERMINISTIC VALIDATION FAILURE] ${finding.title}`,
-            analysis_status: 'completed',
-            risk_level: finding.severity,
-            compliance_risk: finding.severity,
-            reasons: [fullReason],
-            agent_source: 'Agent10'
-        });
-        await newRisk.save();
-        newRisksCount++;
-        console.log(`🚨 [Agent 10] DSL Rule Failed [${finding.id}]: ${finding.title}`);
-    };
-
-    // Step 2: Deterministic Rule Evaluation Engine
-    if (Object.keys(facts).length > 0 && rules.length > 0) {
-        console.log(`[Agent 10] Evaluating ${rules.length} constraints against ${Object.keys(facts).length} extracted facts...`);
-        for (const rule of rules) {
-            try {
-                const failure = evaluateRule(rule, facts);
-                if (failure) {
-                    await pushRisk(failure);
-                }
-            } catch (err) {
-                console.error(`⚠️ [Agent 10] Engine failed to evaluate rule ${rule.id}:`, err.message);
-            }
-        }
-    } else {
-        console.warn(`[Agent 10] LLM did not extract sufficient facts or rules for evaluation.`);
+    if (clauses.length === 0) {
+        console.warn('[Agent 10] No clauses found. Skipping.');
+        return;
     }
 
-    console.log(`✅ [Agent 10] Deterministic Engine completed. Found ${newRisksCount} contradictions.`);
+    let newRisksCount = 0;
+
+    const pushRisk = async (severity, reason, title, clauseRefs = []) => {
+        let updatedCount = 0;
+        if (clauseRefs && clauseRefs.length > 0) {
+            const targetClauses = await Clause.find({
+                contractId,
+                segmentIndex: { $in: clauseRefs }
+            });
+            if (targetClauses.length > 0) {
+                const RISK_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1, null: 0 };
+                const COMP_PRIORITY = { high: 3, medium: 2, low: 1, null: 0 };
+
+                for (const targetClause of targetClauses) {
+                    const currentLevel = targetClause.risk_level || 'low';
+                    if (RISK_PRIORITY[severity] > RISK_PRIORITY[currentLevel]) {
+                        targetClause.risk_level = severity;
+                    }
+                    
+                    const newRiskScore = severity === 'critical' ? 10 : severity === 'high' ? 8 : 6;
+                    targetClause.risk_score = Math.max(targetClause.risk_score || 0, newRiskScore);
+                    
+                    if (!targetClause.risk_reasons) targetClause.risk_reasons = [];
+                    if (!targetClause.risk_reasons.includes(reason)) {
+                        targetClause.risk_reasons.push(reason);
+                    }
+
+                    if (!targetClause.reasons) targetClause.reasons = [];
+                    if (!targetClause.reasons.includes(reason)) {
+                        targetClause.reasons.push(reason);
+                    }
+
+                    targetClause.confidence_score = 10;
+
+                    const compSeverity = (severity === 'critical' || severity === 'high') ? 'high' : (severity === 'medium' ? 'medium' : 'low');
+                    const curComp = targetClause.compliance_risk_level || 'low';
+                    if (COMP_PRIORITY[compSeverity] > COMP_PRIORITY[curComp]) {
+                        targetClause.compliance_risk_level = compSeverity;
+                    }
+
+                    await targetClause.save();
+                    updatedCount++;
+                }
+            }
+        }
+
+        if (updatedCount === 0) {
+            const newRisk = new Clause({
+                contractId,
+                segmentIndex: 9999 + newRisksCount,
+                rawText: `[DETERMINISTIC VALIDATION FAILURE] ${title}`,
+                analysis_status: 'completed',
+                risk_level: severity,
+                risk_score: severity === 'critical' ? 10 : severity === 'high' ? 8 : 6,
+                confidence_score: 10,
+                compliance_risk_level: (severity === 'critical' || severity === 'high') ? 'high' : (severity === 'medium' ? 'medium' : 'low'),
+                risk_reasons: [reason],
+                reasons: [reason],
+                agent_source: 'Agent10'
+            });
+            await newRisk.save();
+            newRisksCount++;
+            console.log(`🚨 [Agent 10] Deterministic Trap Caught (Fallback Virtual Clause): ${title} (${severity})`);
+        } else {
+            console.log(`🚨 [Agent 10] Deterministic Trap Caught: ${title} (${severity}) - Mapped to ${updatedCount} original clauses.`);
+        }
+    };
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 1: Zero-LLM Deterministic Extraction + Contradiction Detection
+    // ════════════════════════════════════════════════════════════════════════
+    console.log(`[Agent 10] Phase 1: Extracting facts from ${clauses.length} clauses...`);
+
+    const clauseData = clauses.map(c => ({
+        segmentIndex: c.segmentIndex,
+        rawText: c.rawText,
+    }));
+
+    const factTable = extractFactTable(clauseData);
+    console.log(`[Agent 10] Phase 1: Extracted ${factTable.facts.length} facts (${Object.keys(factTable.categorizedFacts).length} categories).`);
+
+    const { findings } = detectContradictions(factTable, clauseData);
+    console.log(`[Agent 10] Phase 1: Contradiction engine found ${findings.length} issues.`);
+
+    // Persist all deterministic findings
+    for (const finding of findings) {
+        await pushRisk(finding.severity, finding.reason, finding.title, finding.clauseRefs);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // PHASE 2: Optional LLM Enhancement Pass
+    // ════════════════════════════════════════════════════════════════════════
+    // Only runs if an LLM provider is available. This catches qualitative
+    // contradictions that pure regex/pattern-matching may miss.
+    try {
+        console.log(`[Agent 10] Phase 2: Attempting LLM enhancement pass...`);
+        const fullText = clauses.map(c => c.rawText).join('\n\n');
+
+        const llmResult = await callLLM({
+            systemPrompt: DSL_EXTRACTION_PROMPT,
+            userContent: JSON.stringify({ contractText: fullText }),
+            jsonMode: true,
+            temperature: 0.1,
+            maxTokens: 4000
+        });
+
+        // callLLM already returns the parsed object directly — no need for .parsed
+        const data = llmResult;
+
+        if (data?.rules && Array.isArray(data.rules)) {
+            console.log(`[Agent 10] Phase 2: LLM returned ${data.rules.length} DSL rules.`);
+
+            // Schema guard: Normalize hallucinated types
+            const parseCleanNumber = (val) => {
+                if (typeof val === 'number') return val;
+                const strVal = String(val).toLowerCase();
+                const cleaned = strVal.replace(/[^0-9.-]+/g, '');
+                let num = Number(cleaned);
+                if (strVal.includes('k') && num < 1000) num *= 1000;
+                if (strVal.includes('m') && num < 1000) num *= 1000000;
+                return isNaN(num) ? 0 : num;
+            };
+
+            for (const rule of data.rules) {
+                try {
+                    let rawType = String(rule.type || '').toLowerCase().trim();
+                    let type = rawType;
+                    if (rawType.includes('sum') || rawType.includes('math') || rawType.includes('add')) type = 'sum_equals';
+                    else if (rawType.includes('multiply') || rawType.includes('multiplier')) type = 'multiply_equals';
+                    else if (rawType.includes('timeline') || rawType.includes('less') || rawType.includes('conflict')) type = 'less_than_or_equal';
+                    else if (rawType.includes('greater')) type = 'greater_than';
+
+                    let leftVal = rule.leftFact?.value;
+                    let rightVal = rule.rightFact?.value;
+                    let passed = true;
+
+                    if (type === 'sum_equals') {
+                        let arr = Array.isArray(leftVal) ? leftVal : String(leftVal).split(',');
+                        const sum = arr.reduce((a, b) => a + parseCleanNumber(b), 0);
+                        passed = Math.abs(sum - parseCleanNumber(rightVal)) < 0.01;
+                    }
+                    else if (type === 'multiply_equals') {
+                        let arr = Array.isArray(leftVal) ? leftVal : String(leftVal).split(',');
+                        const product = arr.reduce((a, b) => a * (parseCleanNumber(b) || 1), 1);
+                        passed = Math.abs(product - parseCleanNumber(rightVal)) < 0.01;
+                    }
+                    else if (type === 'less_than_or_equal') {
+                        passed = (parseCleanNumber(leftVal) <= parseCleanNumber(rightVal));
+                    }
+                    else if (type === 'greater_than') {
+                        passed = (parseCleanNumber(leftVal) > parseCleanNumber(rightVal));
+                    }
+
+                    if (!passed) {
+                        // Check if this finding duplicates a Phase 1 finding
+                        const titleLower = (rule.title || '').toLowerCase();
+                        const isDuplicate = findings.some(f =>
+                            f.title.toLowerCase().includes(titleLower.substring(0, 20)) ||
+                            titleLower.includes(f.title.toLowerCase().substring(0, 20))
+                        );
+
+                        if (!isDuplicate) {
+                            await pushRisk(
+                                rule.severity || 'high',
+                                rule.reason || `Contradiction detected between ${rule.leftFact?.label} and ${rule.rightFact?.label}.`,
+                                rule.title || 'Mathematical/Temporal Contradiction'
+                            );
+                        } else {
+                            console.log(`[Agent 10] Phase 2: Skipping duplicate LLM finding: ${rule.title}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`⚠️ [Agent 10] Error evaluating DSL rule "${rule.title}": ${err.message}`);
+                }
+            }
+        } else {
+            console.warn(`[Agent 10] Phase 2: LLM did not return a valid "rules" array. Response keys: ${Object.keys(data || {}).join(', ') || '(empty)'}`);
+        }
+    } catch (llmErr) {
+        // LLM enhancement is optional — if it fails, Phase 1 results still stand
+        console.warn(`[Agent 10] Phase 2: LLM pass skipped (${llmErr.message}). Phase 1 deterministic results are preserved.`);
+    }
+
+    console.log(`✅ [Agent 10] Three-Layer Audit completed. Found ${newRisksCount} total contradictions.`);
 }
 
 module.exports = { runAgent10DeterministicAudit };

@@ -70,8 +70,9 @@ Rewrite the ORIGINAL CLAUSE above so that it perfectly resolves the issues highl
  * Runs Agent 8 concurrently on all High/Critical risk clauses.
  */
 async function runAgent8DrafterForContract(contractId) {
-    const pLimit = (await import('p-limit')).default;
-    const limit = pLimit(5); // 5 concurrent Ollama calls max
+    const pLimit = require('p-limit');
+    const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+    const limit = limitFn(5); // 5 concurrent calls max
 
     const Contract = require('../models/Contract');
     const Clause = require('../models/Clause');

@@ -35,12 +35,29 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       'other': ['general_contract_law']
     };
     
-    const activeDomains = mapping ? mapping.targetDomains : (CLAUSE_TYPE_DOMAIN_FALLBACK[clauseType] || ['general_contract_law']);
+    let activeDomains = mapping ? mapping.targetDomains : (CLAUSE_TYPE_DOMAIN_FALLBACK[clauseType] || ['general_contract_law']);
+    
+    // Clean up domains for non-employment contracts to avoid labor law bleed
+    if (contractType !== 'employment') {
+      activeDomains = activeDomains.filter(domain => domain !== 'labor_law');
+    }
+
+    // Safety guard: if all domains were filtered out, fall back to general contract law
+    // to prevent an empty $in query that would return zero results from the vector search
+    if (activeDomains.length === 0) {
+      activeDomains = ['general_contract_law'];
+      console.warn(`⚠️ [Ontology Router] All domains were filtered for [${contractType} → ${clauseType}]. Falling back to general_contract_law.`);
+    }
 
     console.log(`⚖️ [Ontology Router] Mapping [${contractType} ➔ ${clauseType}] to Domains:`, activeDomains);
 
     // 2. Generate the 1024-dimensional dense vector for the target clause wording
-    const queryVector = await generateEmbedding(clauseText, 'search_query');
+    let queryVector;
+    if (Array.isArray(clauseText)) {
+      queryVector = clauseText;
+    } else {
+      queryVector = await generateEmbedding(clauseText, 'search_query');
+    }
 
     // 3. Use the imported StatuteNode model (avoids OverwriteModelError on concurrent calls)
 

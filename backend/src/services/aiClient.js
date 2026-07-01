@@ -34,10 +34,11 @@ function getClient() {
 // ── JSON extraction helper ───────────────────────────────────────────────────
 
 /**
- * Extract and parse JSON from an LLM response that may contain:
- * - Pure JSON
- * - Markdown-fenced JSON (```json ... ```)
- * - Prose with embedded JSON object or array
+ * Extremely resilient JSON extractor that can handle:
+ * - Markdown code fences (even if missing the closing backticks)
+ * - Trailing commas
+ * - Embedded newlines inside strings
+ * - Single quotes instead of double quotes
  */
 function extractJSON(raw) {
   let text = raw.trim();
@@ -47,11 +48,12 @@ function extractJSON(raw) {
     return JSON.parse(text);
   } catch { /* continue */ }
 
-  // Strategy 2: Strip markdown fences
+  // Strategy 2: Strip markdown fences (even incomplete ones)
   if (text.includes('```')) {
-    const fenced = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
-    if (fenced) {
+    const fenced = text.match(/```(?:json|javascript|js)?\s*\n?([\s\S]*?)(?:```|$)/i);
+    if (fenced && fenced[1]) {
       try { return JSON.parse(fenced[1].trim()); } catch { /* continue */ }
+      text = fenced[1].trim(); // Update text to the stripped version for Strategy 3
     }
   }
 
@@ -78,12 +80,18 @@ function extractJSON(raw) {
   }
 
   if (start !== -1 && end > start) {
-    const candidate = text.substring(start, end + 1);
+    let candidate = text.substring(start, end + 1);
     try { return JSON.parse(candidate); } catch { /* continue */ }
+    
+    // Strategy 4: Aggressive JS Object evaluation (Handles trailing commas, single quotes, unescaped newlines)
+    try {
+      // By using new Function, we can parse JS-like JSON safely in this context
+      return (new Function(`return ${candidate}`))();
+    } catch { /* continue */ }
   }
 
   throw new Error(
-    `Failed to extract JSON from LLM response. First 200 chars: "${text.substring(0, 200)}"`
+    `Failed to extract JSON from LLM response. First 200 chars: "${raw.substring(0, 200)}"`
   );
 }
 
@@ -142,7 +150,7 @@ async function callGrok({
   }
 
   const totalTokens = data?.usage?.total_tokens || 0;
-  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
+  return { parsed: jsonMode ? extractJSON(rawText) : rawText, tokens: totalTokens, model };
 }
 
 // ── Hugging Face Serverless Client ──────────────────────────────────────────
@@ -220,7 +228,7 @@ async function callHuggingFace({
       }
 
       const totalTokens = data?.usage?.total_tokens || 0;
-      return { parsed: extractJSON(rawText), tokens: totalTokens, model };
+      return { parsed: jsonMode ? extractJSON(rawText) : rawText, tokens: totalTokens, model };
     } catch (err) {
       lastErr = err;
       const isNetwork = err.message.includes('fetch failed') || err.message.includes('EAI_AGAIN') || err.message.includes('ENOTFOUND');
@@ -256,10 +264,12 @@ async function callGroq({
 
   const model = modelName || process.env.GROQ_MODEL_NAME || 'llama-3.3-70b-versatile';
 
+  const finalSystemPrompt = jsonMode ? `${systemPrompt}\nOutput in json format.` : systemPrompt;
+
   const body = {
     model,
     messages: [
-      { role: 'system', content: systemPrompt },
+      { role: 'system', content: finalSystemPrompt },
       { role: 'user', content: userContent },
     ],
     temperature: temperature ?? 0.1,
@@ -291,7 +301,7 @@ async function callGroq({
   }
 
   const totalTokens = data?.usage?.total_tokens || 0;
-  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
+  return { parsed: jsonMode ? extractJSON(rawText) : rawText, tokens: totalTokens, model };
 }
 
 // ── Ollama Local Client ───────────────────────────────────────────────────────
@@ -358,7 +368,7 @@ async function callOllama({
   }
 
   const totalTokens = (data?.prompt_eval_count || 0) + (data?.eval_count || 0);
-  return { parsed: extractJSON(rawText), tokens: totalTokens, model };
+  return { parsed: jsonMode ? extractJSON(rawText) : rawText, tokens: totalTokens, model };
 }
 
 // ── Main entry point ─────────────────────────────────────────────────────────
@@ -381,10 +391,12 @@ async function callLLM({
   jsonMode = true,
   temperature = 0.1,
   maxTokens = 8192,
+  modelOverride,
+  providerOverride,
 } = {}) {
   // Intelligent Token-Aware Automatic Chunking Handler
   const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4.0);
-  if (estimatedTokens > 12000) {
+  if (estimatedTokens > 4000) {
     let parsed = null;
     try {
       parsed = JSON.parse(userContent);
@@ -403,25 +415,47 @@ async function callLLM({
           userContent: JSON.stringify({ ...parsed, clauses: chunk1 }),
           jsonMode,
           temperature,
-          maxTokens
+          maxTokens,
+          modelOverride,
+          providerOverride
         }),
         callLLM({
           systemPrompt,
           userContent: JSON.stringify({ ...parsed, clauses: chunk2 }),
           jsonMode,
           temperature,
-          maxTokens
+          maxTokens,
+          modelOverride,
+          providerOverride
         })
       ]);
 
-      const combinedResults = [...(res1?.results || []), ...(res2?.results || [])];
-      return { results: combinedResults };
+      // Intelligently merge sub-results: handle any response shape
+      // The most common shape is { results: [...] } from multi-clause agents.
+      // Other shapes (e.g. Agent 0's { metadata: {...} }) must not be silently dropped.
+      const hasResults1 = Array.isArray(res1?.results);
+      const hasResults2 = Array.isArray(res2?.results);
+
+      if (hasResults1 || hasResults2) {
+        // Standard multi-clause response shape
+        const combinedResults = [...(res1?.results || []), ...(res2?.results || [])];
+        return { results: combinedResults };
+      } else {
+        // Non-standard shape: return the first non-null response (chunking is not appropriate here)
+        console.warn(`[aiClient] Auto-chunker: sub-responses are not { results: [] } shaped. Returning first chunk result. Keys: ${Object.keys(res1 || {}).join(',')}`);
+        return res1 || res2 || {};
+      }
     }
   }
 
   // The actual network execution logic wrapped in our global concurrency limiter
   return globalLlmLimiter(async () => {
-    const primaryProvider = (process.env.LLM_PROVIDER || 'gemini').toLowerCase();
+    const primaryProvider = (providerOverride || process.env.LLM_PROVIDER || 'gemini').toLowerCase();
+
+    if (primaryProvider === 'local' || primaryProvider === 'mock' || process.env.FORCE_LOCAL_LLM === 'true') {
+      console.log(`[aiClient] Force Local/Mock LLM enabled. Returning Smart Local Fallback.`);
+      return generateSmartLocalFallback(systemPrompt, userContent);
+    }
 
     const tryGroqLarge = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.3-70b-versatile' });
     const tryGroqFast = () => callGroq({ systemPrompt, userContent, jsonMode, temperature, maxTokens, modelName: 'llama-3.1-8b-instant' });
@@ -430,7 +464,7 @@ async function callLLM({
     const tryOllama = () => callOllama({ systemPrompt, userContent, jsonMode, temperature, maxTokens });
     const tryGemini = async () => {
       const client = getClient();
-      let activeModel = AI_MODEL_NAME;
+      let activeModel = modelOverride || AI_MODEL_NAME;
 
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
@@ -475,7 +509,7 @@ async function callLLM({
           }
 
           const totalTokens = result.response.usageMetadata?.totalTokenCount || 0;
-          return { parsed: extractJSON(text), tokens: totalTokens, model: activeModel };
+          return { parsed: jsonMode ? extractJSON(text) : text, tokens: totalTokens, model: activeModel };
         } catch (err) {
           const isQuota = (err.message || '').toLowerCase().includes('quota');
           if (attempt < 2 && isTransient(err)) {
@@ -499,7 +533,7 @@ async function callLLM({
     providers.push({ name: 'gemini', fn: tryGemini, available: !!process.env.GEMINI_API_KEY });
     providers.push({ name: 'groq-large', fn: tryGroqLarge, available: !!process.env.GROQ_API_KEY });
     providers.push({ name: 'groq', fn: tryGroqFast, available: !!process.env.GROQ_API_KEY });
-    // providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
+    providers.push({ name: 'huggingface', fn: tryHuggingFace, available: !!process.env.HUGGINGFACE_API_KEY && !process.env.DISABLE_HF });
     providers.push({ name: 'grok', fn: tryGrok, available: !!process.env.GROK_API_KEY });
     providers.push({ name: 'ollama', fn: tryOllama, available: process.env.OLLAMA_ENABLED === 'true' });
 
@@ -539,6 +573,8 @@ async function callLLM({
       }
     }
 
+    const fs = require('fs');
+    fs.appendFileSync('ai_fallback_errors.log', new Date().toISOString() + ' - Fallback triggered. Last Error: ' + (lastError ? lastError.stack || lastError.message : 'Unknown') + '\n');
     console.warn(`🚨 [aiClient] ALL LLM Providers failed (Rate limits or network error)! Activating zero-latency Smart Local Fallback...`);
     try {
       return generateSmartLocalFallback(systemPrompt, userContent);

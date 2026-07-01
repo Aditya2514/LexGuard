@@ -8,12 +8,15 @@ class EmbeddingService {
   constructor() {
     this.modelName = 'Xenova/bge-m3'; 
     this.extractor = null;
+    this.initPromise = null;
   }
 
   async init() {
-    if (!this.extractor) {
-      this.extractor = await pipeline('feature-extraction', this.modelName);
+    if (this.extractor) return;
+    if (!this.initPromise) {
+      this.initPromise = pipeline('feature-extraction', this.modelName);
     }
+    this.extractor = await this.initPromise;
   }
 
   async generateEmbedding(text, taskType = 'search_document') {
@@ -79,8 +82,13 @@ function cosineSimilarity(vecA, vecB) {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-async function searchSimilarClauses(contractId, queryText, topK = 3) {
-  const queryVector = await generateEmbedding(queryText, 'search_query');
+async function searchSimilarClauses(contractId, queryTextOrVector, topK = 3) {
+  let queryVector;
+  if (Array.isArray(queryTextOrVector)) {
+    queryVector = queryTextOrVector;
+  } else {
+    queryVector = await generateEmbedding(queryTextOrVector, 'search_query');
+  }
   if (!queryVector) return [];
 
   const clauses = await Clause.find({

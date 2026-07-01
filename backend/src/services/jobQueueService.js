@@ -18,6 +18,9 @@ const pLimit = require('p-limit');
 
 const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
 const workerLimit = limitFn(3); // Process up to 3 contracts concurrently
+// Shared agent limiter: serialize all LLM-calling agents across ALL concurrent jobs
+// to prevent rate limit storms (3 jobs × 3 agents = 9 concurrent LLM calls without this)
+const agentLimit = limitFn(1);
 
 const QUEUE_NAME = 'lexguard:queue';
 let workerActive = false;
@@ -84,11 +87,14 @@ async function processContractJob(contractId) {
         console.error(`⚠️  Non-fatal: Clause embedding failed, skipping RAG index creation: ${err.message}`);
       })
     ]);
+    // Limit concurrency to 1 to prevent Rate Limit token explosion (429 Model Downgrade)
+    // Note: agentLimit is module-level to coordinate across ALL concurrent contract jobs
+    
     await updateJobProgress(contractId, 45, 'Analyzing risks and extracting metadata');
     await Promise.all([
-      analyseRisksForContract(contractId),
-      runAgent4FinancialAnalyst(contractId),
-      runAgent5LifecycleExtractor(contractId)
+      agentLimit(() => analyseRisksForContract(contractId)),
+      agentLimit(() => runAgent4FinancialAnalyst(contractId)),
+      agentLimit(() => runAgent5LifecycleExtractor(contractId))
     ]);
 
     // 4. Run Agent 3, Compliance Checker, and Agent 9 Concurrently
@@ -97,11 +103,13 @@ async function processContractJob(contractId) {
     const { runCrossRefAudit } = require('./agent9CrossRefAuditor');
     const { runAgent10DeterministicAudit } = require('./agent10DeterministicAuditor');
 
+    // Run Agent 10 first to ensure risk_levels are deterministic and escalated in DB before other agents read them
+    await agentLimit(() => runAgent10DeterministicAudit(contractId));
+
     await Promise.all([
-      generateUserAdvocateForContract(contractId),
-      runComplianceCheckForContract(contractId),
-      runCrossRefAudit(contractId),
-      runAgent10DeterministicAudit(contractId)
+      agentLimit(() => generateUserAdvocateForContract(contractId)),
+      agentLimit(() => runComplianceCheckForContract(contractId)),
+      agentLimit(() => runCrossRefAudit(contractId))
     ]);
 
     // 5. Finalize overall contract risk rating

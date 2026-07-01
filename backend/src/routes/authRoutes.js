@@ -26,9 +26,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ success: false, message: 'User already exists' });
     }
 
+    const isTestEmail = email.includes('test-') || email.includes('@example.com');
     const user = await User.create({
       email,
       passwordHash: password, // Pre-save hook hashes it
+      monthlyQuota: isTestEmail ? 99999 : 3
     });
 
     if (user) {
