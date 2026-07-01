@@ -6,7 +6,7 @@
  * a major source of contract ambiguity and downstream legal risk.
  */
 
-const callLLM = require('./aiClient');
+const { callLLM } = require('./aiClient');
 const Contract = require('../models/Contract');
 const Clause = require('../models/Clause');
 
@@ -54,22 +54,67 @@ async function runCrossRefAudit(contractId) {
         .join('\n\n');
 
     try {
-        console.log(`[Agent 9] Running Cross-Reference Audit for contract ${contractId}...`);
-        
-        const parsed = await callLLM({
-            systemPrompt: AGENT9_SYSTEM_PROMPT,
-            userContent: `Analyze this contract:\n\n${fullTextWithMarkers}`,
-            jsonMode: true,
-            temperature: 0.1
-        });
+        console.log(`[Agent 9] Running Cross-Reference Audit for contract ${contractId} (${clauses.length} clauses)...`);
+
+        const CHUNK_SIZE = 15; // Process max 15 clauses per LLM window
+        const allFindings = [];
+        let combinedSummary = '';
+
+        if (clauses.length <= CHUNK_SIZE) {
+            // Small contract: single pass
+            const parsed = await callLLM({
+                systemPrompt: AGENT9_SYSTEM_PROMPT,
+                userContent: `Analyze this contract:\n\n${fullTextWithMarkers}`,
+                jsonMode: true,
+                temperature: 0.1
+            });
+            allFindings.push(...(parsed.cross_ref_findings || []));
+            combinedSummary = parsed.audit_summary || 'No issues found.';
+        } else {
+            // Large contract: chunked windowed analysis
+            console.log(`[Agent 9] Large contract detected (${clauses.length} clauses). Using chunked analysis.`);
+            const clauseMarkers = clauses.map(c => `[Clause ${c.segmentIndex + 1}]\n${c.rawText}`);
+
+            for (let i = 0; i < clauseMarkers.length; i += CHUNK_SIZE) {
+                const window = clauseMarkers.slice(i, i + CHUNK_SIZE);
+                const windowText = window.join('\n\n');
+                const windowLabel = `Clauses ${i + 1}–${Math.min(i + CHUNK_SIZE, clauses.length)}`;
+
+                const parsed = await callLLM({
+                    systemPrompt: AGENT9_SYSTEM_PROMPT,
+                    userContent: `Analyze this contract segment (${windowLabel} of ${clauses.length} total):\n\n${windowText}`,
+                    jsonMode: true,
+                    temperature: 0.1
+                });
+
+                if (parsed?.cross_ref_findings?.length > 0) {
+                    allFindings.push(...parsed.cross_ref_findings);
+                }
+                if (parsed?.audit_summary && parsed.audit_summary !== 'No issues found.') {
+                    combinedSummary += (combinedSummary ? ' ' : '') + parsed.audit_summary;
+                }
+            }
+
+            if (!combinedSummary) combinedSummary = 'No issues found across all contract segments.';
+
+            // Deduplicate findings by issue_text similarity (exact match dedupe)
+            const seen = new Set();
+            const deduped = allFindings.filter(f => {
+                const key = `${f.type}::${f.issue_text?.substring(0, 60)}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            allFindings.splice(0, allFindings.length, ...deduped);
+        }
 
         // Save findings to the Contract model
         await Contract.findByIdAndUpdate(contractId, {
-            crossRefFindings: parsed.cross_ref_findings || [],
-            crossRefAuditSummary: parsed.audit_summary || 'No issues found.'
+            crossRefFindings: allFindings,
+            crossRefAuditSummary: combinedSummary
         });
 
-        console.log(`✅ [Agent 9] Audit complete. Found ${parsed.cross_ref_findings?.length || 0} issues.`);
+        console.log(`✅ [Agent 9] Audit complete. Found ${allFindings.length} issues.`);
 
     } catch (error) {
         console.error(`❌ [Agent 9] Audit failed: ${error.message}`);

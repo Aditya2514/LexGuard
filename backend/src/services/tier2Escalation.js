@@ -12,7 +12,7 @@
  *   - risk_level is 'high' or 'critical'
  */
 
-const callLLM = require('./aiClient');
+const { callLLM } = require('./aiClient');
 
 // ── Tier 2 System Prompt ─────────────────────────────────────────────────────
 
@@ -126,13 +126,20 @@ async function runTier2Escalation(clauseResults, clauseTextMap) {
         }
 
         // Merge Tier 2 results back into the original results
-        const tier2Map = {};
-        for (const t2 of tier2Results.results) {
-            tier2Map[t2.id] = t2;
-        }
+        const mergedResults = clauseResults.map((original, idx) => {
+            // Find by matching ID (handling string vs number differences)
+            let t2 = tier2Results.results.find(r => r && Number(r.id) === Number(original.id));
+            
+            // Fallback 1: match by index if array sizes match
+            if (!t2 && tier2Results.results.length === clauseResults.length) {
+                t2 = tier2Results.results[idx];
+            }
+            
+            // Fallback 2: match first result if single clause
+            if (!t2 && clauseResults.length === 1 && tier2Results.results.length > 0) {
+                t2 = tier2Results.results[0];
+            }
 
-        const mergedResults = clauseResults.map(original => {
-            const t2 = tier2Map[original.id];
             if (!t2) return original;
 
             console.log(

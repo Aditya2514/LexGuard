@@ -22,7 +22,8 @@ class GraphRagService {
         executionDate
     );
 
-    if (!vectorHits || vectorHits.length === 0) return '';
+    if (!vectorHits || vectorHits.length === 0 || vectorHits === 'No specific statutory framework mapped.') return '';
+    if (vectorHits.startsWith('Fallback Notice:')) return vectorHits; // Pass through fallback messages
     
     let augmentedContextStr = `=== GRAPH RAG COMPLIANCE CONTEXT ===\n\n`;
     augmentedContextStr += vectorHits + '\n\n';

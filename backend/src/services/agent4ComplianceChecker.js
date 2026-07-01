@@ -72,8 +72,18 @@ async function runComplianceCheckForContract(contractId) {
         const searchStr = ((enhancedGlobalContext.metadata?.governingLaw || "") + " " + (enhancedGlobalContext.metadata?.jurisdiction || ""));
         const geo = resolveJurisdiction(searchStr);
 
+        const RISK_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1, null: 0 };
+
         for (const c of clauses) {
-            const isRisky = c.risk_level === 'medium' || c.risk_level === 'high' || c.risk_level === 'critical';
+            // Re-fetch the live risk_level per clause: Agent 10 runs before us and may
+            // have escalated clauses after the initial batch query above was made.
+            const liveClause = await Clause.findById(c._id).select('risk_level explanatory_note');
+            const liveRiskLevel = liveClause?.risk_level || c.risk_level;
+            const hasExistingNote = liveClause?.explanatory_note &&
+                liveClause.explanatory_note !== 'No significant compliance issues flagged.' &&
+                liveClause.explanatory_note !== 'Compliant.';
+
+            const isRisky = liveRiskLevel === 'medium' || liveRiskLevel === 'high' || liveRiskLevel === 'critical';
             const shouldScan = isRisky || process.env.FULL_COMPLIANCE_SCAN === 'true';
             
             if (shouldScan) {
@@ -98,21 +108,57 @@ async function runComplianceCheckForContract(contractId) {
                 const mappedRiskLevel = result.isCompliant ? 'low' : 'high';
                 const mappedIssueAreas = result.statutoryCitations ? result.statutoryCitations.map(cit => cit.act) : [];
 
-                await Clause.findByIdAndUpdate(c._id, {
-                    compliance_risk_level: mappedRiskLevel,
+                // Build the compliance update — never downgrade risk_level set by Agent 10
+                const complianceUpdate = {
                     potential_issue_areas: mappedIssueAreas,
                     human_review_strongly_recommended: !result.isCompliant,
-                    explanatory_note: result.violationReason || "Compliant.",
-                });
+                };
+
+                // Only update compliance_risk_level if it would be an upgrade (never downgrade)
+                if (!result.isCompliant) {
+                    const currentComp = liveClause?.compliance_risk_level || 'low';
+                    if ((RISK_PRIORITY['high'] || 0) > (RISK_PRIORITY[currentComp] || 0)) {
+                        complianceUpdate.compliance_risk_level = 'high';
+                    }
+                } else {
+                    // Compliant: only set to low if not already escalated
+                    const currentComp = liveClause?.compliance_risk_level || 'low';
+                    if ((RISK_PRIORITY[currentComp] || 0) <= (RISK_PRIORITY['low'] || 0)) {
+                        complianceUpdate.compliance_risk_level = 'low';
+                    }
+                }
+
+                // Only update explanatory_note if Agent 10 hasn't already written a note
+                if (!hasExistingNote) {
+                    complianceUpdate.explanatory_note = result.violationReason || 'Compliant.';
+                } else if (result.violationReason) {
+                    // Append Agent 4's finding to Agent 10's note rather than overwriting it
+                    complianceUpdate.explanatory_note = liveClause.explanatory_note + ' ' + result.violationReason;
+                }
+
+                await Clause.findByIdAndUpdate(c._id, complianceUpdate);
             } else {
-                await Clause.findByIdAndUpdate(c._id, {
-                    compliance_risk_level: 'low',
+                // Non-risky clause: only set compliance_risk_level if not already escalated by Agent 10
+                const currentComp = liveClause?.compliance_risk_level || 'low';
+                const updateForLow = {
                     potential_issue_areas: [],
                     human_review_strongly_recommended: false,
-                    explanatory_note: 'No significant compliance issues flagged.',
-                });
+                };
+
+                // Only downgrade compliance_risk_level if it is not already high/critical
+                if ((RISK_PRIORITY[currentComp] || 0) <= (RISK_PRIORITY['low'] || 0)) {
+                    updateForLow.compliance_risk_level = 'low';
+                }
+
+                // Only write default note if Agent 10 hasn't already set one
+                if (!hasExistingNote) {
+                    updateForLow.explanatory_note = 'No significant compliance issues flagged.';
+                }
+
+                await Clause.findByIdAndUpdate(c._id, updateForLow);
             }
         }
+
 
         if (contract) {
             contract.agentMetadata = contract.agentMetadata || {};

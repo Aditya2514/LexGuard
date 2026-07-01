@@ -44,7 +44,9 @@ async function runAgent5LifecycleExtractor(contractId) {
     });
 
     if (!Array.isArray(extractedData)) {
-      if (extractedData.lifecycle_events && Array.isArray(extractedData.lifecycle_events)) {
+      if (extractedData.results && Array.isArray(extractedData.results)) {
+        extractedData = extractedData.results;
+      } else if (extractedData.lifecycle_events && Array.isArray(extractedData.lifecycle_events)) {
         extractedData = extractedData.lifecycle_events;
       } else if (extractedData.events && Array.isArray(extractedData.events)) {
         extractedData = extractedData.events;

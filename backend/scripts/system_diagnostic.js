@@ -45,9 +45,19 @@ async function runDiagnostics() {
     // ---------------------------------------------------------
     console.log(`\n${color.blue}--- 1. Infrastructure & Environment ---${color.reset}`);
     
-    const envVars = ['MONGODB_URI', 'REDIS_URL', 'GROQ_API_KEY', 'GEMINI_API_KEY', 'JWT_SECRET'];
-    const missingVars = envVars.filter(v => !process.env[v]);
-    assert(missingVars.length === 0, 'Environment Variables Loaded', 'infrastructure', `Missing: ${missingVars.join(', ')}`);
+    const requiredVars = ['MONGODB_URI', 'REDIS_URL', 'JWT_SECRET'];
+    const missingRequired = requiredVars.filter(v => !process.env[v]);
+    
+    const apiKeys = ['GEMINI_API_KEY', 'GROQ_API_KEY', 'HUGGINGFACE_API_KEY'];
+    const hasAnyKey = apiKeys.some(v => process.env[v]);
+    const isLocal = process.env.LLM_PROVIDER === 'local' || process.env.FORCE_LOCAL_LLM === 'true';
+
+    const envOk = missingRequired.length === 0 && (hasAnyKey || isLocal);
+    let envNote = '';
+    if (missingRequired.length > 0) envNote += `Missing required: ${missingRequired.join(', ')}. `;
+    if (!hasAnyKey && !isLocal) envNote += `No LLM API keys provided and LLM_PROVIDER is not set to local.`;
+
+    assert(envOk, 'Environment Variables Loaded', 'infrastructure', envNote || `LLM Mode: ${isLocal ? 'Local/Mock' : 'Live Cascade'}`);
 
     try {
         await mongoose.connect(process.env.MONGODB_URI);
@@ -94,7 +104,12 @@ async function runDiagnostics() {
     console.log(`\n${color.blue}--- 3. LLM Providers & Fallback Mechanisms ---${color.reset}`);
     try {
         const response = await aiClient.callLLM({ systemPrompt: "You are a test bot.", userContent: "Say 'Ping'", jsonMode: false });
-        assert(response && response.parsed && response.parsed.length > 0, 'LLM Cascade Routing Operational (Groq/Gemini)', 'llm');
+        const isLocal = process.env.LLM_PROVIDER === 'local' || process.env.FORCE_LOCAL_LLM === 'true';
+        if (isLocal) {
+            assert(response && typeof response === 'object', 'LLM Provider Configured (Local/Mock Mode)', 'llm');
+        } else {
+            assert(response && typeof response === 'string' && response.length > 0, 'LLM Cascade Routing Operational (Live API)', 'llm');
+        }
     } catch (e) {
         assert(false, 'LLM Cascade Routing Operational', 'llm', e.message);
     }

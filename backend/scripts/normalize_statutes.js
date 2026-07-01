@@ -99,7 +99,7 @@ async function normalizeStatutes() {
     const regex = new RegExp(`^${rawLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
     
     // Find docs that match the raw pattern but are NOT already canonical
-    const docsToRename = await StatuteNode.find({ actName: regex, actName: { $ne: canonical } }).select('_id actName sectionNumber').lean();
+    const docsToRename = await StatuteNode.find({ actName: { $regex: regex, $ne: canonical } }).select('_id actName sectionNumber').lean();
     
     for (const doc of docsToRename) {
       try {

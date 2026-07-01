@@ -10,20 +10,22 @@ const Contract = require('../models/Contract');
 
 const PRE_FLIGHT_SYSTEM_PROMPT = `
 Role: Elite Enterprise Legal Ontologist & Ingestion Preprocessor.
-Task: Analyze the initial segments of the attached employment contract and build a deterministic Global Context JSON block.
+Task: Analyze the initial segments of the attached legal contract and build a deterministic Global Context JSON block.
+This contract may be of any type: employment agreement, real estate contract, freelance agreement, SaaS contract, NDA, etc.
+Extract party names generically (even if they are buyer/seller, employer/employee, licensor/licensee, etc.).
 
 You must strictly output a valid JSON object matching the schema below. Do NOT append introductory conversational text, markdown formatting blocks, or trailing commentary.
 
 Required Schema:
 {
   "metadata": {
-    "documentType": "String (e.g., 'Employment Agreement', 'Real Estate Contract', 'Non-Disclosure Agreement')",
+    "documentType": "String (e.g., 'Employment Agreement', 'Real Estate Contract', 'Non-Disclosure Agreement', 'Service Agreement')",
     "governingLaw": "String (e.g., 'Republic of India / State of Karnataka')",
     "executionDate": "String (ISO 8601 Date or YYYY-MM-DD)",
-    "employerName": "String",
-    "employeeDesignation": "String",
-    "employeeAddress": "String (The physical city/state/country of the employee)",
-    "companyAddress": "String (The physical city/state/country of the company)"
+    "employerName": "String (Party 1 / Company / Employer / Buyer / Licensor — whichever applies)",
+    "employeeDesignation": "String (Party 2's role or designation — whichever applies)",
+    "employeeAddress": "String (The physical city/state/country of Party 2 / Employee / Seller / Licensee)",
+    "companyAddress": "String (The physical city/state/country of Party 1 / Company / Employer / Buyer)"
   }
 }
 `;

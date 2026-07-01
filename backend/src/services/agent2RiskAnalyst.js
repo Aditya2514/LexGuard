@@ -75,6 +75,12 @@ You must reply with valid JSON only, with this structure:
 - risk_reasons: 1–5 short bullet-style strings.
 - depends_on_clause_ids: An array of integers representing the IDs of other clauses in the same document that this clause references or semantically depends on (e.g. cross-references, definitions).
 - possible_law_references: Use only when there is a clear connection to retrieved legal context or clause type. If mentioning a section, include the act_name. reason must be a short explanation in your own words. The act_key MUST match one of the keys provided in retrieved_legal_context.
+  CITATION QUALITY RULES (MANDATORY):
+  - You MUST cite ONLY section numbers that appear in retrieved_legal_context. NEVER fabricate or guess a section number.
+  - section_hint: Use format "Section X - brief description" (e.g., "Section 27 - agreements in restraint of trade"). Always use the full word "Section" (not "Sec.", "S.", or "s.").
+  - reason: Must explain HOW the statute applies to THIS specific clause. DO NOT restate the clause text. DO NOT restate the statute title. Instead, explain the legal CONSEQUENCE (e.g., "This non-compete may be struck down as void because Indian courts interpret Section 27 as prohibiting post-employment restraints except when protecting genuine trade secrets.").
+  - If retrieved_legal_context provides a matching section, you MUST use that exact section number. Do not invent adjacent sections.
+  - If you cannot find an exact section match in retrieved context, omit the reference entirely rather than guessing.
 
 ### 4. Special handling rules
 - Dispute resolution & governing law clauses: Flag unilateral appointment of arbitrators as at least medium risk.
@@ -240,7 +246,9 @@ function cleanMixedMatrixDownstreamLeaks(clauseObj, text) {
     // 3. Defang False Positives on Mutual/Bilateral Indemnification (TC_019)
     if ((rawText.includes("indemnify") || rawText.includes("indemnification")) &&
         (rawText.includes("each party") || rawText.includes("indemnifying party's") || rawText.includes("mutual")) &&
-        !rawText.includes("sole negligence") && !rawText.includes("own negligence")) {
+        !rawText.includes("sole negligence") && 
+        !rawText.includes("own negligence") &&
+        !rawText.includes("gross negligence")) { // Gross negligence coverage is never a safe harbor
         clauseObj.risk_level = "low";
         clauseObj.risk_score = 1;
         clauseObj.risk_reasons = ["Standard mutual, bilateral indemnification restricted to each party's own gross negligence or misconduct. Balanced risk allocation."];
@@ -354,7 +362,8 @@ async function triggerReflectionLoop(clauseObj, clauseText, globalContext) {
 async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
   // Retrieve case law precedents for each clause concurrently
   const clausesWithPrecedents = await Promise.all(clausesBatch.map(async (c) => {
-    const precedents = await retrieveCaseLawPrecedents(c.text, 2, 0.4); // top 2 cases, min 0.4 similarity
+    const queryVectorOrText = (Array.isArray(c.embedding) && c.embedding.length > 0) ? c.embedding : c.text;
+    const precedents = await retrieveCaseLawPrecedents(queryVectorOrText, 2, 0.4); // top 2 cases, min 0.4 similarity
     return {
       ...c,
       retrieved_case_law: precedents.map(p => `CASE: ${p.case_title} | CITATION: ${p.citation} | PRECEDENT: ${p.summary}`)
@@ -483,10 +492,12 @@ ${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
     }
   }
   
-  // Merge and normalize results
-  const finalResults = await Promise.all(baseResults.map(async (baseAnalysis, index) => {
+  // Merge and normalize results, and selectively apply Reflection/Adversary Judge sequentially
+  const finalResults = [];
+  for (let i = 0; i < baseResults.length; i++) {
+    const baseAnalysis = baseResults[i];
     // Find verified analysis if it exists, otherwise use base
-    const verifiedAnalysis = verifiedRiskyResults[index] || baseAnalysis;
+    const verifiedAnalysis = verifiedRiskyResults[i] || baseAnalysis;
     
     const risk_score = verifiedAnalysis.risk_score !== undefined ? verifiedAnalysis.risk_score : (verifiedAnalysis.score !== undefined ? verifiedAnalysis.score : baseAnalysis.risk_score);
     const risk_level = verifiedAnalysis.risk_level || verifiedAnalysis.riskRating || baseAnalysis.risk_level;
@@ -497,12 +508,8 @@ ${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
     let level = RISK_LEVELS.includes(risk_level ? risk_level.toLowerCase() : '') ? risk_level.toLowerCase() : 'medium';
 
     // ── Bidirectional Score ↔ Level Alignment ──────────────────────────
-    // If the Judge explicitly set a HIGH/CRITICAL level, trust it and
-    // escalate the numeric score to match (prevents the old bug where
-    // a stale low score silently crushed the Judge's escalation).
     if (level === 'critical' && score < 8) score = 8;
     if (level === 'high' && score < 6)     score = 6;
-    // Conversely, if the score is high but the level is low, escalate level
     if (score >= 8 && level !== 'critical') level = 'critical';
     if (score >= 6 && score < 8 && level !== 'critical' && level !== 'high') level = 'high';
     
@@ -548,13 +555,17 @@ ${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
     if (resultObj.risk_score > previousScore) {
         // The deterministic engine escalated the score, meaning the LLM failed. Trigger self-healing!
         resultObj = await triggerReflectionLoop(resultObj, clauseTextMap[baseAnalysis.id] || "", globalContext);
+        // Add a 3000ms delay after reflection to let token buckets refill (only in production/live mode)
+        if (process.env.LLM_PROVIDER !== 'local' && process.env.LLM_PROVIDER !== 'mock' && process.env.FORCE_LOCAL_LLM !== 'true') {
+            await new Promise(r => setTimeout(r, 3000));
+        }
     }
 
     // Sanitize law refs mapped to strict schema keys
     resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
 
-    return resultObj;
-  }));
+    finalResults.push(resultObj);
+  }
 
   return finalResults;
 }
@@ -625,7 +636,7 @@ async function analyseRisksForContract(contractId) {
   const clauses = await Clause.find({
     contractId,
     risk_level: null,
-  }).select('_id rawText clause_type segmentIndex').sort({ segmentIndex: 1 });
+  }).select('_id rawText clause_type segmentIndex embedding').sort({ segmentIndex: 1 });
 
   if (clauses.length > 0) {
     const { resolveJurisdiction } = require('./../utils/geoMapper');
@@ -636,24 +647,30 @@ async function analyseRisksForContract(contractId) {
 
     const { searchSimilarClauses } = require('./embeddingService');
 
-    // Build batch items by fetching dynamic laws in parallel for each item (Intra-agent concurrency)
+    // Build batch items by fetching dynamic laws with limited concurrency to protect the DB connection pool
+    const pLimit = require('p-limit');
+    const limitFn = typeof pLimit === 'function' ? pLimit : pLimit.default;
+    const dbQueryLimit = limitFn(10);
+
     const items = await Promise.all(
-      clauses.map(async (c) => {
+      clauses.map((c) => dbQueryLimit(async () => {
+        const queryVectorOrText = (Array.isArray(c.embedding) && c.embedding.length > 0) ? c.embedding : c.rawText;
+
         const retrieved = await retrieveComplianceContext(
             contract.contractCategory, 
             c.clause_type || 'other', 
-            c.rawText, 
+            queryVectorOrText, 
             resolvedJurisdiction,
             resolvedMunicipality,
             enhancedGlobalContext.metadata?.executionDate
         );
 
         // Fetch Case Law Precedents via Vector Search
-        const retrievedCaseLawRaw = await retrieveCaseLawPrecedents(c.rawText, 2, 0.50);
+        const retrievedCaseLawRaw = await retrieveCaseLawPrecedents(queryVectorOrText, 2, 0.50);
         const retrievedCaseLaw = Array.isArray(retrievedCaseLawRaw) ? retrievedCaseLawRaw.join('\n') : "";
         
         // Zero-Rupee Vector RAG: Fetch related clauses from the same document to maintain context
-        const similarClauses = await searchSimilarClauses(contractId, c.rawText, 3);
+        const similarClauses = await searchSimilarClauses(contractId, queryVectorOrText, 3);
         const retrieved_contract_context = similarClauses
           .filter(sc => sc.clauseId.toString() !== c._id.toString())
           .map(sc => `Clause ${sc.segmentIndex}: ${sc.rawText}`);
@@ -662,58 +679,59 @@ async function analyseRisksForContract(contractId) {
           originalId: c._id.toString(),
           id: c.segmentIndex,
           text: c.rawText,
+          embedding: c.embedding,
           clause_type: c.clause_type || 'other',
           retrieved_legal_context: retrieved,
           retrieved_case_law: retrievedCaseLaw,
           retrieved_contract_context,
         };
-      })
+      }))
     );
 
-    // Process batches in parallel concurrently (Intra-agent concurrency)
-    const batchPromises = [];
+    // Process batches sequentially to respect Groq rate limits (6000 TPM)
+    const batchOpsArrays = [];
     for (let i = 0; i < items.length; i += AGENT_BATCH_SIZE) {
       const batch = items.slice(i, i + AGENT_BATCH_SIZE);
-      const task = async () => {
-        let results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
-        
-        // ── PHASE 2: Tier 2 Escalation (Senior Partner Review) ──
-        const { runTier2Escalation } = require('./tier2Escalation');
-        const clauseTextMap = {};
-        for (const item of batch) {
-           clauseTextMap[item.id] = item.text;
-        }
-        
-        // This will only re-process clauses that meet the escalation criteria
-        results = await runTier2Escalation(results, clauseTextMap);
+      let results = await runAgent2RiskAnalyst(batch, enhancedGlobalContext);
+      
+      // ── PHASE 2: Tier 2 Escalation (Senior Partner Review) ──
+      const { runTier2Escalation } = require('./tier2Escalation');
+      const clauseTextMap = {};
+      for (const item of batch) {
+          clauseTextMap[item.id] = item.text;
+      }
+      
+      results = await runTier2Escalation(results, clauseTextMap);
 
-        return results.map((r) => ({
-          updateOne: {
-            filter: { _id: r.originalId },
-            update: {
-              $set: {
-                has_commercial_asymmetry: r.has_commercial_asymmetry,
-                survives_termination: r.survives_termination,
-                risk_level: r.risk_level,
-                risk_score: r.risk_score,
-                confidence_score: r.confidence_score, // Now capturing confidence score
-                risk_reasons: r.risk_reasons,
-                possible_law_references: r.possible_law_references,
-                // These fields exist if Tier 2 processed the clause
-                ...(r.tier2_escalated ? {
-                    tier2_escalated: r.tier2_escalated,
-                    tier2_agrees: r.tier2_agrees,
-                    tier2_senior_note: r.tier2_senior_note,
-                } : {})
-              },
+      batchOpsArrays.push(results.map((r) => ({
+        updateOne: {
+          filter: { _id: r.originalId },
+          update: {
+            $set: {
+              has_commercial_asymmetry: r.has_commercial_asymmetry,
+              survives_termination: r.survives_termination,
+              risk_level: r.risk_level,
+              risk_score: r.risk_score,
+              confidence_score: r.confidence_score,
+              risk_reasons: r.risk_reasons,
+              possible_law_references: r.possible_law_references,
+              ...(r.tier2_escalated ? {
+                  tier2_escalated: r.tier2_escalated,
+                  tier2_agrees: r.tier2_agrees,
+                  tier2_senior_note: r.tier2_senior_note,
+              } : {})
             },
           },
-        }));
-      };
-      batchPromises.push(task());
+        },
+      })));
+      
+      // Delay 12 seconds to prevent hitting 429 TPM limits on free tier (only in production/live mode)
+      if (i + AGENT_BATCH_SIZE < items.length) {
+        if (process.env.LLM_PROVIDER !== 'local' && process.env.LLM_PROVIDER !== 'mock' && process.env.FORCE_LOCAL_LLM !== 'true') {
+          await new Promise(r => setTimeout(r, 12000));
+        }
+      }
     }
-
-    const batchOpsArrays = await Promise.all(batchPromises);
     const allOps = batchOpsArrays.flat();
 
     if (allOps.length > 0) {

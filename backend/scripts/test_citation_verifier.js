@@ -101,11 +101,15 @@ async function runTest() {
     }
 
     // 6. Summary
+    const totalCitations = totalVerified + totalMisquoted + totalNotFound;
+    const hallucinationRate = totalCitations > 0 ? Math.round((totalMisquoted / totalCitations) * 100) : 0;
+
     console.log('\n═══════════════════════════════════════════════════════');
     console.log('📊 VERIFICATION SUMMARY');
     console.log('═══════════════════════════════════════════════════════');
     console.log(`  Total Clauses Checked:  ${result.totalClauses}`);
-    console.log(`  Average Accuracy:       ${result.avgAccuracy}%`);
+    console.log(`  Weighted Accuracy:      ${result.avgAccuracy}%`);
+    console.log(`  🚨 Hallucination Rate:  ${hallucinationRate}%`);
     console.log(`  ✅ Verified Citations:   ${totalVerified}`);
     console.log(`  ⚠️  Misquoted Citations: ${totalMisquoted}`);
     console.log(`  ❌ Not Found (Possible Hallucinations): ${totalNotFound}`);

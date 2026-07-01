@@ -10,6 +10,7 @@
 
 const StatuteNode = require('../models/StatuteNode');
 const Clause = require('../models/Clause');
+const Contract = require('../models/Contract');
 
 const { AutoModelForSequenceClassification, AutoTokenizer } = require('@xenova/transformers');
 
@@ -53,6 +54,83 @@ class SemanticCitationVerifier {
 
 const semanticVerifier = new SemanticCitationVerifier();
 
+// ── Citation Format Normalizer ───────────────────────────────────────────────
+
+/**
+ * Standardize citation format to "Section X of ActName, Year".
+ * Handles variations: "Sec. 27", "S.27", "Section 27(1)", "Art. 14"
+ */
+function normalizeCitationFormat(sectionHint, actName) {
+    if (!sectionHint) return sectionHint;
+    
+    // Normalize common abbreviations to full form
+    let normalized = sectionHint
+        .replace(/\bSec\.?\s*/gi, 'Section ')
+        .replace(/\bS\.\s*/gi, 'Section ')
+        .replace(/\bArt\.?\s*/gi, 'Article ')
+        .replace(/\bReg\.?\s*/gi, 'Regulation ')
+        .replace(/\bCl\.?\s*/gi, 'Clause ');
+    
+    // Remove "Chunk X/Y" artifacts from ingestion pipeline
+    normalized = normalized.replace(/\s*\(Chunk\s+\d+(?:\/\d+)?\)/gi, '');
+    
+    // Remove leading/trailing dashes and whitespace
+    normalized = normalized.replace(/^\s*[-–—]\s*/, '').replace(/\s*[-–—]\s*$/, '').trim();
+    
+    // If we have an act name and the hint doesn't already include it, append it
+    if (actName && !normalized.toLowerCase().includes(actName.toLowerCase().split(',')[0].trim())) {
+        // Only append if the hint is just a section reference
+        if (/^(Section|Article|Rule|Regulation|Schedule|Clause|Order)\s+\d/i.test(normalized)) {
+            normalized = `${normalized} of ${actName}`;
+        }
+    }
+    
+    return normalized;
+}
+
+/**
+ * Grade citation confidence based on verification results.
+ * Returns: 'strong' | 'weak' | 'hallucinated' | 'unverifiable'
+ */
+function gradeCitationConfidence(verificationStatus, similarityScore) {
+    switch (verificationStatus) {
+        case 'verified':
+            return 'strong';
+        case 'misquoted':
+            return 'hallucinated';
+        case 'not_found':
+            return 'unverifiable';
+        case 'not_applicable':
+            return 'weak'; // Case law — can't verify against statute DB
+        default:
+            return 'unverifiable';
+    }
+}
+
+/**
+ * Extract a brief factual summary from the statute content (first 200 chars).
+ * This helps users see what the statute actually says vs what the LLM claims.
+ */
+function extractStatuteSummary(content, maxLength = 250) {
+    if (!content) return null;
+    
+    // Clean up formatting artifacts
+    const cleaned = content
+        .replace(/\n+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    
+    if (cleaned.length <= maxLength) return cleaned;
+    
+    // Cut at last sentence boundary within the limit
+    const truncated = cleaned.substring(0, maxLength);
+    const lastPeriod = truncated.lastIndexOf('.');
+    if (lastPeriod > maxLength * 0.5) {
+        return truncated.substring(0, lastPeriod + 1);
+    }
+    return truncated + '...';
+}
+
 // ── Citation Extraction ──────────────────────────────────────────────────────
 
 /**
@@ -67,12 +145,17 @@ function extractCitationsFromRefs(lawRefs) {
     const CITATION_REGEX = /(?:Section|Article|Rule|Regulation|Schedule|Clause|Order)\s+(\d+[A-Z]?(?:\(\d+\))?(?:\([a-z]\))?)/gi;
 
     return lawRefs.map(ref => {
-        // Try to find a section number in multiple fields (section_hint first, then reason)
         const fieldsToSearch = [
             ref.section_hint || '',
             ref.reason || '',
             ref.act_name || '',
-        ];
+        ].map(val => val
+            .replace(/\bSec\.?\s*/gi, 'Section ')
+            .replace(/\bS\.\s*/gi, 'Section ')
+            .replace(/\bArt\.?\s*/gi, 'Article ')
+            .replace(/\bReg\.?\s*/gi, 'Regulation ')
+            .replace(/\bCl\.?\s*/gi, 'Clause ')
+        );
 
         let parsedSection = null;
         let parsedSectionNumber = null;
@@ -397,6 +480,7 @@ async function verifyCitations(lawRefs) {
                 verified_act_name: statute.actName,
                 verified_section: statute.sectionNumber,
                 similarity_score: scoreDisplay,
+                statute_summary: extractStatuteSummary(statute.content),
             });
         } else {
             unverifiedCount++;
@@ -411,10 +495,21 @@ async function verifyCitations(lawRefs) {
         }
     }
 
-    // Compute overall citation accuracy for this clause
-    const totalCheckable = verifiedCount + unverifiedCount + notFoundCount;
-    const citationAccuracy = totalCheckable > 0
-        ? Math.round((verifiedCount / totalCheckable) * 100)
+    // Compute overall citation accuracy for this clause using a weighted scoring model:
+    // - strong: 1.0 (verified authority)
+    // - weak: 0.75 (case law / other references)
+    // - unverifiable: 0.15 (section not found in the DB)
+    // - hallucinated: -0.5 (hallucinated / misquoted claim)
+    let weightedSum = 0;
+    for (const ref of verifiedRefs) {
+        const confidence = gradeCitationConfidence(ref.verification_status, ref.similarity_score);
+        if (confidence === 'strong') weightedSum += 1.0;
+        else if (confidence === 'weak') weightedSum += 0.75;
+        else if (confidence === 'unverifiable') weightedSum += 0.15;
+        else if (confidence === 'hallucinated') weightedSum += -0.5;
+    }
+    const citationAccuracy = citations.length > 0
+        ? Math.max(0, Math.min(100, Math.round((weightedSum / citations.length) * 100)))
         : 100; // No checkable citations = 100% (nothing to fail)
 
     return {
@@ -439,7 +534,7 @@ async function verifyCitationsForContract(contractId) {
     const clauses = await Clause.find({
         contractId,
         'possible_law_references.0': { $exists: true }, // Only clauses with citations
-    }).select('_id possible_law_references');
+    }).select('_id possible_law_references risk_level risk_score compliance_risk_level human_review_strongly_recommended risk_reasons reasons explanatory_note');
 
     if (clauses.length === 0) {
         console.log(`[Citation Verifier] No citations to verify for contract ${contractId}.`);
@@ -449,6 +544,10 @@ async function verifyCitationsForContract(contractId) {
     let totalAccuracy = 0;
     let totalNotFound = 0;
     let totalVerified = 0;
+    let countStrong = 0;
+    let countWeak = 0;
+    let countHallucinated = 0;
+    let countUnverifiable = 0;
     const bulkOps = [];
 
     for (const clause of clauses) {
@@ -458,25 +557,85 @@ async function verifyCitationsForContract(contractId) {
         totalNotFound += stats.not_found;
         totalVerified += stats.verified;
 
-        // Strip the parsed helper fields before saving
-        const cleanedRefs = verifiedRefs.map(ref => ({
-            act_key: ref.act_key,
-            act_name: ref.verified_act_name || ref.act_name,
-            section_hint: ref.section_hint,
-            reason: ref.reason,
-            reference_url: ref.reference_url,
-            verification_status: ref.verification_status,
-            verification_note: ref.verification_note,
-        }));
+        let hasInvalidCitation = false;
+        let invalidReasons = [];
+
+        // Strip the parsed helper fields before saving, and normalize format
+        const cleanedRefs = verifiedRefs.map(ref => {
+            const confidence = gradeCitationConfidence(ref.verification_status, ref.similarity_score);
+            if (confidence === 'strong') countStrong++;
+            else if (confidence === 'weak') countWeak++;
+            else if (confidence === 'hallucinated') countHallucinated++;
+            else if (confidence === 'unverifiable') countUnverifiable++;
+
+            if (ref.verification_status === 'not_found') {
+                hasInvalidCitation = true;
+                const secHintCleaned = normalizeCitationFormat(ref.section_hint, ref.verified_act_name || ref.act_name);
+                invalidReasons.push(`Contains reference to nonexistent or uningested statute/section: "${secHintCleaned}".`);
+            } else if (confidence === 'hallucinated') {
+                hasInvalidCitation = true;
+                const secHintCleaned = normalizeCitationFormat(ref.section_hint, ref.verified_act_name || ref.act_name);
+                invalidReasons.push(`Statute interpretation warning: The clause cites "${secHintCleaned}" but semantic verification shows its actual legal scope is misquoted or does not support this claim.`);
+            }
+
+            return {
+                act_key: ref.act_key,
+                act_name: ref.verified_act_name || ref.act_name,
+                section_hint: normalizeCitationFormat(ref.section_hint, ref.verified_act_name || ref.act_name),
+                reason: ref.reason,
+                reference_url: ref.reference_url,
+                verification_status: ref.verification_status,
+                verification_note: ref.verification_note,
+                citation_confidence: confidence,
+                ...(ref.statute_summary && { statute_summary: ref.statute_summary }),
+            };
+        });
+
+        const updates = {
+            possible_law_references: cleanedRefs,
+            citation_accuracy: citationAccuracy,
+        };
+
+        if (hasInvalidCitation) {
+            const RISK_PRIORITY = { critical: 4, high: 3, medium: 2, low: 1, null: 0 };
+            const currentRisk = clause.risk_level || 'low';
+            if (RISK_PRIORITY[currentRisk] < RISK_PRIORITY['high']) {
+                updates.risk_level = 'high';
+                updates.risk_score = 8;
+            }
+            updates.compliance_risk_level = 'high';
+            updates.human_review_strongly_recommended = true;
+
+            // Merge risk reasons
+            let newRiskReasons = [...(clause.risk_reasons || [])];
+            for (const reason of invalidReasons) {
+                if (!newRiskReasons.includes(reason)) {
+                    newRiskReasons.push(reason);
+                }
+            }
+            updates.risk_reasons = newRiskReasons;
+
+            let newReasons = [...(clause.reasons || [])];
+            for (const reason of invalidReasons) {
+                if (!newReasons.includes(reason)) {
+                    newReasons.push(reason);
+                }
+            }
+            updates.reasons = newReasons;
+
+            // Update explanatory note
+            const originalNote = clause.explanatory_note && clause.explanatory_note !== 'Compliant.' && clause.explanatory_note !== 'No significant compliance issues flagged.'
+                ? clause.explanatory_note
+                : '';
+            updates.explanatory_note = (originalNote ? originalNote + ' ' : '') + 
+                `[Compliance Alert] ${invalidReasons.join(' ')}`;
+        }
 
         bulkOps.push({
             updateOne: {
                 filter: { _id: clause._id },
                 update: {
-                    $set: {
-                        possible_law_references: cleanedRefs,
-                        citation_accuracy: citationAccuracy,
-                    },
+                    $set: updates,
                 },
             },
         });
@@ -488,6 +647,28 @@ async function verifyCitationsForContract(contractId) {
 
     const avgAccuracy = Math.round(totalAccuracy / clauses.length);
 
+    // Persist contract-level citation stats
+    try {
+        const totalCitationsCount = clauses.reduce((sum, c) => sum + (c.possible_law_references?.length || 0), 0);
+        const hallucinationRate = totalCitationsCount > 0 ? Math.round((countHallucinated / totalCitationsCount) * 100) : 0;
+
+        await Contract.findByIdAndUpdate(contractId, {
+            $set: {
+                'citationStats.totalCitations': totalCitationsCount,
+                'citationStats.verified': totalVerified,
+                'citationStats.notFound': totalNotFound,
+                'citationStats.avgAccuracy': avgAccuracy,
+                'citationStats.strong': countStrong,
+                'citationStats.weak': countWeak,
+                'citationStats.hallucinated': countHallucinated,
+                'citationStats.unverifiable': countUnverifiable,
+                'citationStats.hallucinationRate': hallucinationRate,
+            }
+        });
+    } catch (statsErr) {
+        console.warn(`⚠️ [Citation Verifier] Failed to persist citation stats: ${statsErr.message}`);
+    }
+
     console.log(
         `✅ [Citation Verifier] Contract ${contractId}: ` +
         `${clauses.length} clauses checked, ${totalVerified} citations verified, ` +
@@ -497,4 +678,4 @@ async function verifyCitationsForContract(contractId) {
     return { totalClauses: clauses.length, avgAccuracy, totalVerified, totalNotFound };
 }
 
-module.exports = { verifyCitations, verifyCitationsForContract };
+module.exports = { verifyCitations, verifyCitationsForContract, gradeCitationConfidence };

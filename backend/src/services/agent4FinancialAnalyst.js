@@ -47,7 +47,9 @@ async function runAgent4FinancialAnalyst(contractId) {
 
     if (!Array.isArray(extractedData)) {
       // If it returned an object with a wrapper key like { "results": [...] } or similar
-      if (extractedData.financial_obligations && Array.isArray(extractedData.financial_obligations)) {
+      if (extractedData.results && Array.isArray(extractedData.results)) {
+        extractedData = extractedData.results;
+      } else if (extractedData.financial_obligations && Array.isArray(extractedData.financial_obligations)) {
         extractedData = extractedData.financial_obligations;
       } else if (extractedData.obligations && Array.isArray(extractedData.obligations)) {
         extractedData = extractedData.obligations;

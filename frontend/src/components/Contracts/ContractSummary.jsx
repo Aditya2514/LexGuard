@@ -66,6 +66,55 @@ export default function ContractSummary({ contract, riskSummary }) {
         )}
       </div>
 
+      {/* Citation statistics categorical breakdown */}
+      {contract?.citationStats && contract.citationStats.totalCitations > 0 && (
+        <div className="citation-panel glass-panel">
+          <h4 className="citation-panel-title">⚖️ Indian Law Citation Accuracy</h4>
+          
+          <div className="citation-accuracy-gauge-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ flex: 1, minWidth: '150px' }}>
+              <div className="citation-accuracy-value-label">
+                Weighted Accuracy: <span className="citation-accuracy-number">{contract.citationStats.avgAccuracy}%</span>
+              </div>
+              <div className="citation-accuracy-bar-bg">
+                <div 
+                  className={`citation-accuracy-bar-fill ${
+                    contract.citationStats.avgAccuracy >= 85 ? 'good' :
+                    contract.citationStats.avgAccuracy >= 60 ? 'warning' : 'poor'
+                  }`}
+                  style={{ width: `${contract.citationStats.avgAccuracy}%` }}
+                />
+              </div>
+            </div>
+
+            <div style={{ flex: '0 0 auto', textAlign: 'right' }}>
+              <div className="citation-accuracy-value-label">
+                Hallucination Rate: <span className="citation-accuracy-number" style={{ color: (contract.citationStats.hallucinationRate || 0) > 0 ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{contract.citationStats.hallucinationRate || 0}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="citation-breakdown">
+            <div className="citation-count citation-count-strong">
+              <span className="citation-count-number">{contract.citationStats.strong || 0}</span>
+              <span className="citation-count-label">Strong (Verified)</span>
+            </div>
+            <div className="citation-count citation-count-weak">
+              <span className="citation-count-number">{contract.citationStats.weak || 0}</span>
+              <span className="citation-count-label">Weak (Case Law)</span>
+            </div>
+            <div className="citation-count citation-count-unverifiable">
+              <span className="citation-count-number">{contract.citationStats.unverifiable || 0}</span>
+              <span className="citation-count-label">Unverifiable</span>
+            </div>
+            <div className="citation-count citation-count-hallucinated">
+              <span className="citation-count-number">{contract.citationStats.hallucinated || 0}</span>
+              <span className="citation-count-label">Hallucinated</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="summary-disclaimer">
         This summary highlights clauses that may carry risk. It is informational only and not legal advice.
       </p>

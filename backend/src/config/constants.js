@@ -39,7 +39,7 @@ const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Number of clauses to send per AI batch call
-const AGENT_BATCH_SIZE = 10;
+const AGENT_BATCH_SIZE = parseInt(process.env.AGENT_BATCH_SIZE, 10) || 20;
 
 module.exports = {
   CONTRACT_CATEGORIES,
@@ -52,4 +52,3 @@ module.exports = {
   MAX_FILE_SIZE_BYTES,
   AGENT_BATCH_SIZE,
 };
-

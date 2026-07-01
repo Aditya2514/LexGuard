@@ -18,7 +18,12 @@ function cosineSimilarity(vecA, vecB) {
 async function retrieveCaseLawPrecedents(queryText, topK = 3, threshold = 0.5) {
   try {
     // 1. Embed the query text
-    const queryVector = await generateEmbedding(queryText, 'search_query');
+    let queryVector;
+    if (Array.isArray(queryText)) {
+      queryVector = queryText;
+    } else {
+      queryVector = await generateEmbedding(queryText, 'search_query');
+    }
     if (!queryVector) {
         console.warn(`⚠️ [RAG] Failed to embed query text for case law retrieval.`);
         return [];

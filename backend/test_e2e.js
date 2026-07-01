@@ -8,7 +8,8 @@ const fs   = require('fs');
 const path = require('path');
 const JSZip = require('jszip');
 
-const BASE_URL = 'http://localhost:7860';
+const PORT = process.env.PORT || 7860;
+const BASE_URL = `http://localhost:${PORT}`;
 let passed = 0, failed = 0;
 const failures = [];
 let authToken = '';
@@ -86,7 +87,7 @@ async function makeDocx(paragraphs = []) {
 
 // Contract paragraphs for realistic testing
 const CONTRACT_PARAS = [
-  'EMPLOYMENT AGREEMENT',
+  'EMPLOYMENT AGREEMENT AND SERVICE COVENANT FOR SENIOR LEADERSHIP',
   'This Agreement is made effective as of January 1 2025 between TechCorp India Pvt Ltd (Company) and Rahul Sharma (Employee).',
   '1. NON-COMPETE CLAUSE',
   'The Employee shall not compete for a period of three years after termination of employment in any territory worldwide.',

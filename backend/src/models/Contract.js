@@ -108,6 +108,19 @@ const contractSchema = new mongoose.Schema(
     // ── Phase 3: Agent 9 (Cross-Reference Auditor) ──────────────────────
     crossRefFindings: { type: [crossRefFindingSchema], default: [] },
     crossRefAuditSummary: { type: String, default: null },
+
+    // ── Citation Statistics (Categorical Breakdown) ───────────────────
+    citationStats: {
+      totalCitations: { type: Number, default: 0 },
+      verified: { type: Number, default: 0 },
+      notFound: { type: Number, default: 0 },
+      avgAccuracy: { type: Number, default: 0 },
+      strong: { type: Number, default: 0 },
+      weak: { type: Number, default: 0 },
+      hallucinated: { type: Number, default: 0 },
+      unverifiable: { type: Number, default: 0 },
+      hallucinationRate: { type: Number, default: 0 },
+    },
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

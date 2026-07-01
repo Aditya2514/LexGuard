@@ -25,6 +25,7 @@ You are provided with the FULL TEXT of the contract clauses below, along with th
 
 async function chatWithContract(contractId, userMessage) {
   const { generateEmbedding } = require('./embeddingService');
+  const targetId = typeof contractId === 'string' ? new mongoose.Types.ObjectId(contractId) : contractId;
 
   let contextText = '';
   try {
@@ -41,7 +42,7 @@ async function chatWithContract(contractId, userMessage) {
           queryVector: queryVector,
           numCandidates: 50,
           limit: 5,
-          filter: { contractId: contractId }
+          filter: { contractId: targetId }
         }
       },
       {

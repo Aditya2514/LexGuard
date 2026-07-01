@@ -1,5 +1,11 @@
-require('dotenv').config(); // Trigger nodemon restart for groq multi-provider update
-
+const dotenv = require('dotenv');
+const parsed = dotenv.config().parsed;
+if (parsed) {
+  for (const key in parsed) {
+    process.env[key] = parsed[key];
+  }
+}
+// Trigger nodemon restart 2
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
