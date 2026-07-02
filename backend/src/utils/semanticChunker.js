@@ -23,6 +23,12 @@ class SemanticChunker {
     // not abbreviations like "U.S.A." or "Pvt.Ltd." where the next char after capital is also capital or a period.
     clean = clean.replace(/\.([A-Z][a-z])/g, '. $1');
 
+    // Ensure section/clause numbers on newlines are separated by double newlines for proper chunking
+    clean = clean.replace(/\n(\d{1,2}(?:\.\d{1,2})*\.?\s+)/g, '\n\n$1');
+    
+    // Ensure "HIDDEN:" markers on newlines are separated by double newlines to segment predatory traps
+    clean = clean.replace(/\n(HIDDEN:)/gi, '\n\n$1');
+
     return clean;
   }
 
