@@ -9,6 +9,7 @@ class EmbeddingService {
     this.modelName = 'Xenova/bge-m3'; 
     this.extractor = null;
     this.initPromise = null;
+    this.disposeTimeout = null;
   }
 
   async init() {
@@ -21,6 +22,12 @@ class EmbeddingService {
 
   async generateEmbedding(text, taskType = 'search_document') {
     await this.init();
+
+    // Clear any pending disposal timer
+    if (this.disposeTimeout) {
+      clearTimeout(this.disposeTimeout);
+      this.disposeTimeout = null;
+    }
     
     // BGE-m3 does not require prefixes. Just clean the text.
     const cleanText = text.replace(/\s+/g, ' ').trim();
@@ -31,7 +38,28 @@ class EmbeddingService {
       normalize: true,
     });
 
+    // Schedule auto-disposal after 30 seconds of inactivity in low memory mode
+    if (process.env.LOW_MEMORY_MODE === 'true') {
+      this.disposeTimeout = setTimeout(() => {
+        this.dispose().catch(err => console.warn(`[EmbeddingService] Auto-dispose error:`, err));
+      }, 30000);
+    }
+
     return Array.from(output.data);
+  }
+
+  async dispose() {
+    if (this.extractor) {
+      console.log(`[EmbeddingService] Disposing embedding model to free memory...`);
+      try {
+        await this.extractor.dispose();
+      } catch (err) {
+        console.warn(`[EmbeddingService] Non-fatal dispose error:`, err);
+      }
+      this.extractor = null;
+      this.initPromise = null;
+      this.disposeTimeout = null;
+    }
   }
 }
 

@@ -30,6 +30,12 @@ class SemanticCitationVerifier {
   }
 
   async verifySemanticEquivalence(archaicStatute, modernSummary) {
+    if (process.env.LOW_MEMORY_MODE === 'true') {
+      const score = computeTextSimilarity(modernSummary, archaicStatute);
+      console.log(`[Verifier] [Low-Memory Mode] Semantic Equivalence Overlap: ${score}% (Threshold: 25%)`);
+      return score >= 25;
+    }
+
     await this.init();
 
     // Cross-Encoders take the query (modern summary) and document (archaic statute)
