@@ -130,7 +130,14 @@ async function runComplianceCheckForContract(contractId) {
 
                 // Only update explanatory_note if Agent 10 hasn't already written a note
                 if (!hasExistingNote) {
-                    complianceUpdate.explanatory_note = result.violationReason || 'Compliant.';
+                    if (result.violationReason) {
+                        complianceUpdate.explanatory_note = result.violationReason;
+                    } else if (c.possible_law_references && c.possible_law_references.length > 0) {
+                        const refSummary = c.possible_law_references.map(r => `${r.act_name} (${r.section_hint || 'General'})`).join(', ');
+                        complianceUpdate.explanatory_note = `Evaluated under ${refSummary}: ${c.possible_law_references[0].reason || 'Statutory parameters apply.'}`;
+                    } else {
+                        complianceUpdate.explanatory_note = 'No significant compliance issues flagged.';
+                    }
                 } else if (result.violationReason) {
                     // Append Agent 4's finding to Agent 10's note rather than overwriting it
                     complianceUpdate.explanatory_note = liveClause.explanatory_note + ' ' + result.violationReason;
