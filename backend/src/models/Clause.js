@@ -9,9 +9,11 @@ const lawReferenceSchema = new mongoose.Schema(
     section_hint: { type: String },
     reason: { type: String },
     reference_url: { type: String },
-    // Citation Verification Layer fields
+    // Citation Verification & Compliance Confidence Layer fields
     verification_status: { type: String, enum: ['verified', 'misquoted', 'not_found', 'unverifiable', 'not_applicable', null], default: null },
     verification_note: { type: String, default: null },
+    compliance_confidence_tag: { type: String, default: null },
+    compliance_confidence_score: { type: Number, default: null },
   },
   { _id: false }
 );
