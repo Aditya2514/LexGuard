@@ -216,6 +216,12 @@ async function callHuggingFace({
         continue;
       }
 
+      if (res.status === 402 || (res.status === 400 && (await res.clone().text()).toLowerCase().includes('quota'))) {
+        const quotaErr = await res.text();
+        console.warn(`⚠️ [HuggingFace] Free credit quota exceeded (402). Skipping Hugging Face and engaging next provider in cascade.`);
+        throw new Error(`Hugging Face Quota Exceeded (402): ${quotaErr}`);
+      }
+
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`Hugging Face API Error (${res.status}): ${errText}`);
