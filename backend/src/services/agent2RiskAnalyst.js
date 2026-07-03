@@ -455,6 +455,17 @@ async function runAgent2RiskAnalyst(clausesBatch, globalContext) {
       dynamicConstraints = "\nCRITICAL: Because this is a Real Estate document, you are FORBIDDEN from citing the Indian Contract Act for property transfer mechanics. You MUST ground your reasoning in the Transfer of Property Act, 1882 or the Registration Act, 1908.\n";
     }
 
+    // Selective Symbol Table RAG Isolation: Only pass definitions referenced in this active clause text
+    const relevantSymbolTable = {};
+    if (globalContext.symbolTable && typeof globalContext.symbolTable === 'object') {
+      const lowerClauseText = (c.text || '').toLowerCase();
+      for (const [term, def] of Object.entries(globalContext.symbolTable)) {
+        if (term && term.length > 2 && lowerClauseText.includes(term.toLowerCase())) {
+          relevantSymbolTable[term] = def;
+        }
+      }
+    }
+
     const globalPreamble = `
 ======================================================================
 [V3 CRITICAL ARCHITECTURAL RUNTIME CONTEXT - DO NOT BYPASS]
@@ -466,8 +477,8 @@ Governing Framework: ${globalContext.metadata?.governingLaw || "Not Explicitly D
 Corporate Employer: ${globalContext.metadata?.employerName || "Not Explicitly Defined"}
 Target Designation: ${globalContext.metadata?.employeeDesignation || "Not Explicitly Defined"}
 ${dynamicConstraints}
-Global Graph RAG Symbol Table (Extracted Definitions):
-${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
+Relevant Symbol Table (Referenced Definitions for Active Clause):
+${JSON.stringify(relevantSymbolTable, null, 2)}
 ======================================================================
 
 [ACTIVE TARGET EVALUATION CLAUSE TEXT]:
@@ -679,6 +690,10 @@ function sanitiseLawRefs(refs) {
         section_hint: r.section_hint || '',
         reason: r.reason || '',
         reference_url: cfg.reference_url,
+        verification_status: r.verification_status || null,
+        verification_note: r.verification_note || null,
+        compliance_confidence_tag: r.compliance_confidence_tag || r.confidenceTag || 'High Confidence',
+        compliance_confidence_score: r.compliance_confidence_score || r.confidenceScore || 85,
       };
     });
 }

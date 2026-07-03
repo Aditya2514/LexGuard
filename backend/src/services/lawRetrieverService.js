@@ -145,6 +145,15 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
           return false;
         }
 
+        // Strict restraint safety: Section 27 (Indian Contract Act - Restraint of Trade) is ONLY allowed if clause text explicitly contains restraint keywords
+        const isSection27 = (match.sectionNumber === '27' || (match.content && match.content.includes('restraint of trade')));
+        const restraintTerms = ['non-compete', 'non compete', 'restricted period', 'restraint of trade', 'shall not engage', 'compete with', '60-month', '60 month', 'post-termination competition'];
+        const hasRestraintKeywords = restraintTerms.some(term => lowerClauseText.includes(term));
+        if (isSection27 && !hasRestraintKeywords) {
+          console.log(`⚖️ [Retriever Safety Filter] Rejection: Section 27 (Restraint of Trade) rejected on non-restraint clause.`);
+          return false;
+        }
+
         return true;
       })
       .map(match => {
@@ -152,7 +161,9 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
         return {
           ...match,
           confidenceScore,
-          confidenceTag
+          confidenceTag,
+          compliance_confidence_score: confidenceScore,
+          compliance_confidence_tag: confidenceTag
         };
       });
 
