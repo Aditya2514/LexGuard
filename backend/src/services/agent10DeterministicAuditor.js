@@ -105,15 +105,29 @@ async function runAgent10DeterministicAudit(contractId) {
         }
 
         if (updatedCount === 0 && clauses.length > 0) {
-            // Map to the primary clause (clauses[0]) and record in contract contradictions array
-            const firstClause = clauses[0];
-            firstClause.risk_reasons = firstClause.risk_reasons || [];
-            if (!firstClause.risk_reasons.includes(`[Deterministic Finding] ${title}: ${reason}`)) {
-                firstClause.risk_reasons.push(`[Deterministic Finding] ${title}: ${reason}`);
-            }
-            await firstClause.save();
+            const titleLower = (title || '').toLowerCase();
+            const reasonLower = (reason || '').toLowerCase();
+            
+            // Intelligently map to target clause if text/type matches finding
+            const targetClause = clauses.find(c => {
+                const textLower = (c.rawText || '').toLowerCase();
+                const typeLower = (c.clauseType || '').toLowerCase();
+                if ((titleLower.includes('restricted') || reasonLower.includes('restricted')) && (typeLower.includes('non_compete') || textLower.includes('restricted period'))) return true;
+                if ((titleLower.includes('product') || reasonLower.includes('work product')) && (typeLower.includes('ip') || textLower.includes('work product'))) return true;
+                return false;
+            });
 
-            // Store in contract-level contradictions array
+            if (targetClause) {
+                targetClause.risk_reasons = targetClause.risk_reasons || [];
+                if (!targetClause.risk_reasons.includes(`[Deterministic Finding] ${title}: ${reason}`)) {
+                    targetClause.risk_reasons.push(`[Deterministic Finding] ${title}: ${reason}`);
+                }
+                targetClause.risk_level = severity;
+                targetClause.risk_score = Math.max(targetClause.risk_score || 0, severity === 'critical' ? 10 : 8);
+                await targetClause.save();
+            }
+
+            // Store in contract-level contradictions array without corrupting Clause #1 opening header
             await Contract.findByIdAndUpdate(contractId, {
                 $push: {
                     contradictions: {

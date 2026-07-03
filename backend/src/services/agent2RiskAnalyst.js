@@ -326,8 +326,14 @@ function enforcePredatoryTrapEscalation(clauseObj, text) {
 function resolveClausalInterdependencies(clauseObj, rawText, globalContext) {
   if (!globalContext || !globalContext.symbolTable || !rawText) return clauseObj;
 
-  const symbolTable = globalContext.symbolTable;
   const lowerText = rawText.toLowerCase();
+
+  // Skip interdependency resolution for introductory headers (preamble / title)
+  if (lowerText.includes('this master services agreement') || lowerText.includes('this agreement is entered into') || (lowerText.startsWith('master services agreement') && lowerText.length < 250)) {
+    return clauseObj;
+  }
+
+  const symbolTable = globalContext.symbolTable;
   const interdependencyWarnings = [];
   let maxTargetScore = parseInt(clauseObj.risk_score, 10) || 5;
   let targetLevel = clauseObj.risk_level || 'low';
