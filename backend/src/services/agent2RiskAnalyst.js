@@ -638,6 +638,11 @@ ${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
     // Sanitize law refs mapped to strict schema keys
     resultObj.possible_law_references = sanitiseLawRefs(resultObj.possible_law_references);
 
+    // Boilerplate Isolation Gate: Clear out forced statutory citations for low-risk standard clauses
+    if ((resultObj.risk_level === 'low' || resultObj.risk_score <= 2) && (!resultObj.interdependency_warnings || resultObj.interdependency_warnings.length === 0)) {
+      resultObj.possible_law_references = [];
+    }
+
     finalResults.push(resultObj);
   }
 
