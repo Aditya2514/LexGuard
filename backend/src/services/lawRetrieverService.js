@@ -45,17 +45,17 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       'delivery_possession': ['real_estate_law', 'general_contract_law'],
       'ip_assignment': ['intellectual_property', 'general_contract_law'],
       'intellectual_property': ['intellectual_property', 'general_contract_law'],
-      'dispute_resolution': ['dispute_resolution', 'general_contract_law'],
-      'governing_law': ['dispute_resolution', 'general_contract_law'],
-      'confidentiality': ['labor_law', 'data_privacy'],
+      'dispute_resolution': ['dispute_resolution'],
+      'governing_law': ['dispute_resolution'],
+      'confidentiality': ['data_privacy'],
       'indemnification': ['general_contract_law'],
       'liability_limit': ['general_contract_law', 'consumer_protection'],
       'auto_renewal': ['general_contract_law', 'consumer_protection'],
-      'amendment': ['general_contract_law', 'labor_law'],
+      'amendment': ['general_contract_law'],
       'warranty': ['general_contract_law', 'consumer_protection'],
       'force_majeure': ['general_contract_law'],
       'disclosure': ['real_estate_law', 'general_contract_law'],
-      'timeline_performance': ['real_estate_law', 'general_contract_law'],
+      'timeline_performance': ['general_contract_law'],
       'licensing': ['intellectual_property', 'general_contract_law'],
       'other': ['general_contract_law']
     };
@@ -128,8 +128,25 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
 
     // Elevated Relevance Cutoff: 0.70 to eliminate misattributed/tenuous statutory matches
     const RELEVANCE_THRESHOLD = 0.70;
+    const lowerClauseText = typeof clauseText === 'string' ? clauseText.toLowerCase() : '';
+    
+    const financialTerms = ['cheque', 'promissory', 'bill of exchange', 'negotiable', 'bank', 'escrow', 'trade', 'execution price', 'fund', 'managing director', 'share capital'];
+    const hasFinancialContext = financialTerms.some(term => lowerClauseText.includes(term));
+
     const relevantMatches = statutoryMatches
-      .filter(match => match.similarityScore >= RELEVANCE_THRESHOLD)
+      .filter(match => {
+        if (match.similarityScore < RELEVANCE_THRESHOLD) return false;
+        
+        // Strict domain safety: reject Negotiable Instruments / Banking / Corporate MD acts unless clause text is explicitly financial
+        const actLower = (match.actName || '').toLowerCase();
+        const isFinancialAct = actLower.includes('negotiable instruments') || actLower.includes('banking regulation') || (actLower.includes('companies act') && match.sectionNumber === '190');
+        if (isFinancialAct && !hasFinancialContext) {
+          console.log(`⚖️ [Retriever Safety Filter] Rejection: Act '${match.actName}' (Sec ${match.sectionNumber}) does not match non-financial clause text.`);
+          return false;
+        }
+
+        return true;
+      })
       .map(match => {
         const { confidenceScore, confidenceTag } = getComplianceConfidence(match.similarityScore);
         return {

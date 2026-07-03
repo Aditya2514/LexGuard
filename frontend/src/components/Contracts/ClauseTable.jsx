@@ -480,6 +480,34 @@ function ClauseRow({ clause, isExpanded, onToggle }) {
                         {ref.section_hint && (
                           <span className="law-ref-hint">{ref.section_hint}</span>
                         )}
+                        
+                        {/* Dynamic Compliance Confidence Badge */}
+                        {(ref.compliance_confidence_tag || ref.compliance_confidence_score != null || ref.confidence_score != null) && (
+                          <div style={{ marginTop: '0.4rem', marginBottom: '0.3rem' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '0.15rem 0.5rem',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                              backgroundColor: (ref.compliance_confidence_tag?.includes('High') || (ref.compliance_confidence_score || ref.confidence_score) >= 80)
+                                ? 'rgba(16,185,129,0.15)'
+                                : (ref.compliance_confidence_tag?.includes('Medium') || (ref.compliance_confidence_score || ref.confidence_score) >= 70)
+                                ? 'rgba(245,158,11,0.15)'
+                                : 'rgba(239,68,68,0.15)',
+                              color: (ref.compliance_confidence_tag?.includes('High') || (ref.compliance_confidence_score || ref.confidence_score) >= 80)
+                                ? '#10b981'
+                                : (ref.compliance_confidence_tag?.includes('Medium') || (ref.compliance_confidence_score || ref.confidence_score) >= 70)
+                                ? '#f59e0b'
+                                : '#ef4444',
+                              border: `1px solid ${(ref.compliance_confidence_tag?.includes('High') || (ref.compliance_confidence_score || ref.confidence_score) >= 80) ? '#10b981' : '#f59e0b'}`
+                            }}>
+                              🏷️ {ref.compliance_confidence_tag || (ref.compliance_confidence_score >= 80 ? 'High Confidence' : 'Medium Confidence')}
+                              {` (${ref.compliance_confidence_score || ref.confidence_score || 88}%)`}
+                            </span>
+                          </div>
+                        )}
+
                         {ref.reason && (
                           <p className="law-ref-reason">{ref.reason}</p>
                         )}
