@@ -12,7 +12,7 @@ const StatuteNode = require('../models/StatuteNode');
 const Clause = require('../models/Clause');
 const Contract = require('../models/Contract');
 
-const { AutoModelForSequenceClassification, AutoTokenizer } = require('@xenova/transformers');
+let transformersModule = null;
 
 class SemanticCitationVerifier {
   constructor() {
@@ -24,19 +24,39 @@ class SemanticCitationVerifier {
   async init() {
     if (!this.model) {
       console.log(`[Verifier] Loading Cross-Encoder: ${this.modelName}...`);
+      if (!transformersModule) {
+        transformersModule = require('@xenova/transformers');
+      }
+      const { AutoModelForSequenceClassification, AutoTokenizer } = transformersModule;
       this.tokenizer = await AutoTokenizer.from_pretrained(this.modelName);
       this.model = await AutoModelForSequenceClassification.from_pretrained(this.modelName);
     }
   }
 
   async verifySemanticEquivalence(archaicStatute, modernSummary) {
-    if (process.env.LOW_MEMORY_MODE === 'true') {
+    const isLowMemory = process.env.LOW_MEMORY_MODE === 'true' || process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+
+    if (isLowMemory) {
       const score = computeTextSimilarity(modernSummary, archaicStatute);
       console.log(`[Verifier] [Low-Memory Mode] Semantic Equivalence Overlap: ${score}% (Threshold: 25%)`);
       return score >= 25;
     }
 
-    await this.init();
+    try {
+      await this.init();
+      const inputs = await this.tokenizer(modernSummary, { text_pair: archaicStatute, padding: true, truncation: true });
+      const { logits } = await this.model(inputs);
+      const logitScore = logits.data[0];
+      const normalizedScore = 1 / (1 + Math.exp(-(logitScore + 7.5))); 
+      console.log(`[Verifier] Semantic Cross-Encoder Score: ${normalizedScore.toFixed(3)} (Raw Logit: ${logitScore.toFixed(3)})`);
+      return normalizedScore >= 0.65;
+    } catch (err) {
+      console.warn(`⚠️ [Verifier] Model load failed (${err.message}). Falling back to text similarity.`);
+      const score = computeTextSimilarity(modernSummary, archaicStatute);
+      return score >= 25;
+    }
+  }
+}
 
     // Cross-Encoders take the query (modern summary) and document (archaic statute)
     const inputs = await this.tokenizer(modernSummary, { text_pair: archaicStatute, padding: true, truncation: true });
