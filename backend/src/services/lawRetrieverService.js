@@ -22,6 +22,17 @@ function getComplianceConfidence(similarityScore) {
  */
 async function retrieveComplianceContext(contractType, clauseType, clauseText, jurisdiction = "Central", municipality = null, executionDate = null) {
   try {
+    // Preamble / Title / Witness Signature Gate: Skip statutory vector search for introductory boilerplate
+    const textSample = typeof clauseText === 'string' ? clauseText.toLowerCase() : '';
+    const isPreambleOrSignature = clauseType === 'preamble' || clauseType === 'title' || clauseType === 'parties' ||
+      textSample.includes('this master services agreement') || textSample.includes('this agreement is entered into') ||
+      textSample.includes('in witness whereof') || (textSample.startsWith('master services agreement') && textSample.length < 200);
+
+    if (isPreambleOrSignature) {
+      console.log(`⚖️ [Ontology Router] Skipping statutory vector search for introductory header.`);
+      return "No specific statutory framework mapped.";
+    }
+
     // 1. Fetch the exact statutory routing domains for this specific intersection
     const mapping = await LegalDomainMap.findOne({ contractType, clauseType });
     

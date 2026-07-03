@@ -104,23 +104,27 @@ async function runAgent10DeterministicAudit(contractId) {
             }
         }
 
-        if (updatedCount === 0) {
-            const newRisk = new Clause({
-                contractId,
-                segmentIndex: 9999 + newRisksCount,
-                rawText: `[DETERMINISTIC VALIDATION FAILURE] ${title}`,
-                analysis_status: 'completed',
-                risk_level: severity,
-                risk_score: severity === 'critical' ? 10 : severity === 'high' ? 8 : 6,
-                confidence_score: 10,
-                compliance_risk_level: (severity === 'critical' || severity === 'high') ? 'high' : (severity === 'medium' ? 'medium' : 'low'),
-                risk_reasons: [reason],
-                reasons: [reason],
-                agent_source: 'Agent10'
+        if (updatedCount === 0 && clauses.length > 0) {
+            // Map to the primary clause (clauses[0]) and record in contract contradictions array
+            const firstClause = clauses[0];
+            firstClause.risk_reasons = firstClause.risk_reasons || [];
+            if (!firstClause.risk_reasons.includes(`[Deterministic Finding] ${title}: ${reason}`)) {
+                firstClause.risk_reasons.push(`[Deterministic Finding] ${title}: ${reason}`);
+            }
+            await firstClause.save();
+
+            // Store in contract-level contradictions array
+            await Contract.findByIdAndUpdate(contractId, {
+                $push: {
+                    contradictions: {
+                        title: title,
+                        severity: severity,
+                        reason: reason,
+                        timestamp: new Date()
+                    }
+                }
             });
-            await newRisk.save();
-            newRisksCount++;
-            console.log(`🚨 [Agent 10] Deterministic Trap Caught (Fallback Virtual Clause): ${title} (${severity})`);
+            console.log(`🚨 [Agent 10] Deterministic Trap Caught (Document-Level Finding): ${title} (${severity})`);
         } else {
             console.log(`🚨 [Agent 10] Deterministic Trap Caught: ${title} (${severity}) - Mapped to ${updatedCount} original clauses.`);
         }
