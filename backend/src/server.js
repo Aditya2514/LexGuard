@@ -5,7 +5,11 @@ if (parsed) {
     process.env[key] = parsed[key];
   }
 }
-// Trigger nodemon restart 2
+// ── Startup Validations ──────────────────────────────────────────────────────
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  WARNING: JWT_SECRET is not set in .env — authentication will fail. Set it before using auth routes.');
+}
+
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
@@ -42,7 +46,22 @@ app.use(rateLimit({
     });
   }
 }));
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'https://lexguard.vercel.app',
+  'https://adity251105-lexguard-backend.hf.space',
+  process.env.FRONTEND_URL,  // Allow custom override via env
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, cb) => {
+    // Allow requests with no origin (server-to-server, curl, mobile apps)
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(null, false);
+  },
+  credentials: true
+}));
 app.use(express.json({ limit: '11mb' }));
 app.use(express.urlencoded({ extended: true, limit: '11mb' }));
 

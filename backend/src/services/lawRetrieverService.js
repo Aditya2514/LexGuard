@@ -1,7 +1,21 @@
 const LegalDomainMap = require('../models/LegalDomainMap');
-const { generateEmbedding } = require('./embeddingService'); // Pre-existing service
+const { generateEmbedding } = require('./embeddingService');
 const mongoose = require('mongoose');
 const StatuteNode = require('../models/StatuteNode');
+
+/**
+ * Helper to compute Compliance Confidence Score and Tag based on Vector Similarity
+ */
+function getComplianceConfidence(similarityScore) {
+  const scorePercent = Math.min(100, Math.max(0, Math.round(similarityScore * 100)));
+  let tag = 'Low Confidence / Requires Review';
+  if (similarityScore >= 0.80) {
+    tag = 'High Confidence';
+  } else if (similarityScore >= 0.70) {
+    tag = 'Medium Confidence';
+  }
+  return { confidenceScore: scorePercent, confidenceTag: tag };
+}
 
 /**
  * Dynamically retrieves relevant Indian Statutory Sections based on contract ontology and semantics
@@ -42,8 +56,7 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       activeDomains = activeDomains.filter(domain => domain !== 'labor_law');
     }
 
-    // Safety guard: if all domains were filtered out, fall back to general contract law
-    // to prevent an empty $in query that would return zero results from the vector search
+    // Safety guard
     if (activeDomains.length === 0) {
       activeDomains = ['general_contract_law'];
       console.warn(`⚠️ [Ontology Router] All domains were filtered for [${contractType} → ${clauseType}]. Falling back to general_contract_law.`);
@@ -59,16 +72,12 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       queryVector = await generateEmbedding(clauseText, 'search_query');
     }
 
-    // 3. Use the imported StatuteNode model (avoids OverwriteModelError on concurrent calls)
-
-    // Build filter based on executionDate
+    // 3. Build filter
     const vectorFilter = {
         domain: { $in: activeDomains },
         jurisdiction: { $in: ["Central", jurisdiction, municipality].filter(Boolean) }
     };
     
-    // If contract was executed before July 1, 2024, don't filter out repealed laws (IPC/CrPC still apply)
-    // If no execution date or after July 1, 2024, filter out repealed laws
     const cutoffDate = new Date('2024-07-01');
     const execDate = executionDate ? new Date(executionDate) : new Date();
     
@@ -81,16 +90,16 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
     const statutoryMatches = await StatuteNode.aggregate([
       {
         $vectorSearch: {
-          index: "lexguard_statutes_vector_index", // Index registered in Atlas
+          index: "lexguard_statutes_vector_index",
           path: "embedding",
           queryVector: queryVector,
           numCandidates: 100,
           limit: 20,
-          filter: vectorFilter // Use indexed fields here for efficiency
+          filter: vectorFilter
         }
       },
       {
-        $match: matchFilter // Use unindexed fields here
+        $match: matchFilter
       },
       {
         $limit: 5
@@ -106,16 +115,29 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
       }
     ]);
 
-    const RELEVANCE_THRESHOLD = 0.60;
-    const relevantMatches = statutoryMatches.filter(match => match.similarityScore >= RELEVANCE_THRESHOLD);
+    // Elevated Relevance Cutoff: 0.70 to eliminate misattributed/tenuous statutory matches
+    const RELEVANCE_THRESHOLD = 0.70;
+    const relevantMatches = statutoryMatches
+      .filter(match => match.similarityScore >= RELEVANCE_THRESHOLD)
+      .map(match => {
+        const { confidenceScore, confidenceTag } = getComplianceConfidence(match.similarityScore);
+        return {
+          ...match,
+          confidenceScore,
+          confidenceTag
+        };
+      });
 
     if (relevantMatches.length === 0) {
       return "No specific statutory framework mapped.";
     }
 
-    // 5. Format results into structured prompt blocks
+    // 5. Format results into structured prompt blocks with Compliance Confidence Tags
     return relevantMatches.map(match => (
-      `AUTHORITATIVE STATUTE: ${match.actName} - Section ${match.sectionNumber}\nStatutory Provision Text: ${match.content}\n[Domain Context: ${match.domain}]`
+      `AUTHORITATIVE STATUTE: ${match.actName} - Section ${match.sectionNumber}\n` +
+      `[Compliance Confidence: ${match.confidenceTag} (${match.confidenceScore}% Vector Match)]\n` +
+      `Statutory Provision Text: ${match.content}\n` +
+      `[Domain Context: ${match.domain}]`
     )).join('\n\n');
 
   } catch (error) {
@@ -124,4 +146,8 @@ async function retrieveComplianceContext(contractType, clauseType, clauseText, j
   }
 }
 
-module.exports = { retrieveComplianceContext, getEmbedding: generateEmbedding };
+module.exports = { 
+  retrieveComplianceContext, 
+  getEmbedding: generateEmbedding,
+  getComplianceConfidence 
+};
