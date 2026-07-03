@@ -169,6 +169,12 @@ async function processContractJob(contractId) {
     // Fire webhook to notify enterprise integrations
     await dispatchWebhooks('contract.analyzed', contractId);
 
+    // Trigger V8 Garbage Collection to immediately free heap memory on Render
+    if (typeof global.gc === 'function') {
+      global.gc();
+      console.log(`🧹 [JobQueueService] V8 Heap Garbage Collection completed.`);
+    }
+
   } catch (err) {
     console.error(`❌ [Queue Worker] Fatal error processing contract ${contractId}:`, err.message);
     

@@ -38,11 +38,12 @@ class EmbeddingService {
       normalize: true,
     });
 
-    // Schedule auto-disposal after 30 seconds of inactivity in low memory mode
-    if (process.env.LOW_MEMORY_MODE === 'true') {
+    // Schedule aggressive auto-disposal (5 seconds) on Render/Low Memory environments
+    const isLowMemory = process.env.LOW_MEMORY_MODE === 'true' || process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+    if (isLowMemory) {
       this.disposeTimeout = setTimeout(() => {
         this.dispose().catch(err => console.warn(`[EmbeddingService] Auto-dispose error:`, err));
-      }, 30000);
+      }, 5000);
     }
 
     return Array.from(output.data);
