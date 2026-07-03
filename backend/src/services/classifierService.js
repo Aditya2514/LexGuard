@@ -12,6 +12,7 @@
  * Returns objects with { type, severity } so the escalation layer can
  * distinguish CRITICAL-level traps from HIGH-level traps.
  */
+const { callLLM } = require('./aiClient');
 
 /**
  * Detects predatory traps using deterministic keyword pattern matching.
@@ -19,8 +20,6 @@
  * @param {string} text - The clause text to analyze
  * @returns {{ type: string, severity: 'critical' | 'high' }[]} Detected traps
  */
-const callLLM = require('./aiClient');
-
 const SEMANTIC_TRAP_PROMPT = `You are a semantic trap detector (Agent 4) auditing an Indian contract clause.
 Analyze the text for hidden predatory traps that do not explicitly use obvious keywords but have the same material effect (e.g., disguised non-competes, backdoor wage theft, unconscionable unilateral variance exploits).
 Return JSON only:
@@ -242,6 +241,61 @@ function detectPredatoryTraps(text) {
     );
     if (hasPostEmploymentTerm && hasRestraintTerm) {
         detectedTraps.push({ type: 'post-employment non-compete', severity: 'critical' });
+    }
+
+    // ── Pattern 10: Power of Attorney over Personal Social Media / Accounts ──
+    if (lower.includes('power of attorney') && (lower.includes('social media') || lower.includes('personal account'))) {
+        detectedTraps.push({ type: 'irrevocable power of attorney over personal accounts', severity: 'critical' });
+    }
+
+    // ── Pattern 11: Unrelated Business Ideas & Overreaching IP Grab ──────
+    if ((lower.includes('future business ideas') || lower.includes('unrelated to the project') || lower.includes('children') || lower.includes('spouse')) && (lower.includes('sole property') || lower.includes('owns') || lower.includes('property'))) {
+        detectedTraps.push({ type: 'overreaching intellectual property grab', severity: 'critical' });
+    }
+
+    // ── Pattern 12: Silent Network Data Harvesting & Sale ──────────────
+    if ((lower.includes('harvest') || lower.includes('sell')) && (lower.includes('metadata') || lower.includes('network'))) {
+        detectedTraps.push({ type: 'silent network data harvesting and sale', severity: 'critical' });
+    }
+
+    // ── Pattern 13: Anti-Audit Threats & Criminal Prosecution ──────────
+    if (lower.includes('audit') && (lower.includes('criminal prosecution') || lower.includes('breach'))) {
+        detectedTraps.push({ type: 'anti-audit threat of criminal prosecution', severity: 'critical' });
+    }
+
+    // ── Pattern 14: SLA Downtime Exemption on Global Economic Events ───
+    if (lower.includes('downtime') && (lower.includes('exempt') || lower.includes('economic event'))) {
+        detectedTraps.push({ type: 'predatory sla downtime exemption', severity: 'critical' });
+    }
+
+    // ── Pattern 15: Shift of Physical Data Center Costs to Subscriber ──
+    if ((lower.includes('electricity') || lower.includes('cooling') || lower.includes('data center')) && (lower.includes('subscriber') || lower.includes('responsible'))) {
+        detectedTraps.push({ type: 'unreasonable infrastructure cost shift', severity: 'critical' });
+    }
+
+    // ── Pattern 16: Prohibition of Post-Hire Future Technology ────────
+    if (lower.includes('invented after') || (lower.includes('technology') && lower.includes('prohibited'))) {
+        detectedTraps.push({ type: 'post-hire technology prohibition', severity: 'critical' });
+    }
+
+    // ── Pattern 17: Retroactive Change of Trade Execution Price ───────
+    if (lower.includes('retroactively change') || (lower.includes('execution price') && lower.includes('trade'))) {
+        detectedTraps.push({ type: 'retroactive trade execution price alteration', severity: 'critical' });
+    }
+
+    // ── Pattern 18: Inactivity Fund Forfeiture ────────────────────────
+    if ((lower.includes('waives the right') || lower.includes('funds') || lower.includes('fail to log in')) && lower.includes('7 consecutive days')) {
+        detectedTraps.push({ type: 'predatory account inactivity fund forfeiture', severity: 'critical' });
+    }
+
+    // ── Pattern 19: Remote Hardware Bricking / Deactivation ───────────
+    if (lower.includes('deactivate') || lower.includes('deactivate hardware')) {
+        detectedTraps.push({ type: 'remote hardware deactivation', severity: 'critical' });
+    }
+
+    // ── Pattern 20: Hardware Defect Indemnity Liability Shift ─────────
+    if (lower.includes('indemnify') && (lower.includes('physical harm') || lower.includes('manufacturing defects'))) {
+        detectedTraps.push({ type: 'hardware defect liability shift', severity: 'critical' });
     }
     
     // ═══════════════════════════════════════════════════════════════════════

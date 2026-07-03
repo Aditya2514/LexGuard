@@ -62,7 +62,9 @@ You must reply with valid JSON only, with this structure:
           "act_key": "INDIAN_CONTRACT_ACT",
           "act_name": "Indian Contract Act, 1872",
           "section_hint": "Section 27 - agreements in restraint of trade",
-          "reason": "The clause imposes a 24-month non-compete, potentially restraining the employee's trade."
+          "reason": "The clause imposes a 24-month non-compete, potentially restraining the employee's trade.",
+          "compliance_confidence_score": 92,
+          "compliance_confidence_tag": "High Confidence"
         }
       ]
     }
@@ -74,7 +76,7 @@ You must reply with valid JSON only, with this structure:
 - confidence_score: integer from 1 to 10. Use 9-10 for explicit statutory violations, 5-8 for inferred commercial risks, and 1-4 if the clause is highly ambiguous and requires human lawyer review.
 - risk_reasons: 1–5 short bullet-style strings.
 - depends_on_clause_ids: An array of integers representing the IDs of other clauses in the same document that this clause references or semantically depends on (e.g. cross-references, definitions).
-- possible_law_references: Use only when there is a clear connection to retrieved legal context or clause type. If mentioning a section, include the act_name. reason must be a short explanation in your own words. The act_key MUST match one of the keys provided in retrieved_legal_context.
+- possible_law_references: Use only when there is a clear connection to retrieved legal context or clause type. If mentioning a section, include the act_name. reason must be a short explanation in your own words. Include compliance_confidence_score (0-100) and compliance_confidence_tag ("High Confidence" for >=80%, "Medium Confidence" for 70-79%, "Low Confidence / Requires Review" for <70%).
   CITATION QUALITY RULES (MANDATORY):
   - You MUST cite ONLY section numbers that appear in retrieved_legal_context. NEVER fabricate or guess a section number.
   - section_hint: Use format "Section X - brief description" (e.g., "Section 27 - agreements in restraint of trade"). Always use the full word "Section" (not "Sec.", "S.", or "s.").
@@ -83,6 +85,7 @@ You must reply with valid JSON only, with this structure:
   - If you cannot find an exact section match in retrieved context, omit the reference entirely rather than guessing.
 
 ### 4. Special handling rules
+- Account Forfeiture & Inactivity Seizure: Any clause seizing user balances, funds, or waiving account equity upon inactivity MUST be evaluated directly under Section 23 (Unconscionable Agreements Opposed to Public Policy) and Section 74 (Stipulation by way of Penalty) of the Indian Contract Act, 1872.
 - Dispute resolution & governing law clauses: Flag unilateral appointment of arbitrators as at least medium risk.
 - Post-employment restraints: For post-termination non-compete clauses, treat them as high-impact risk for employees. Mention Indian courts often treat broad post-termination non-competes as void restraints of trade under Section 27 of the Indian Contract Act, 1872, using cautious language.
 - Persona Filtering: If the document is identified as an Employment Agreement or Contract of Service, completely disable references to B2C frameworks like the Consumer Protection Act, 2019.
@@ -313,6 +316,74 @@ function enforcePredatoryTrapEscalation(clauseObj, text) {
     return clauseObj;
 }
 
+/**
+ * Cross-Reference & Defined Term Interdependency Resolver
+ * 
+ * Checks if a defined term in the Symbol Table (e.g., "Work Product", "Losses", "Confidential Information")
+ * or an earlier Master Agreement definition fundamentally alters/escalates the risk profile
+ * of a later seemingly standard clause.
+ */
+function resolveClausalInterdependencies(clauseObj, rawText, globalContext) {
+  if (!globalContext || !globalContext.symbolTable || !rawText) return clauseObj;
+
+  const symbolTable = globalContext.symbolTable;
+  const lowerText = rawText.toLowerCase();
+  const interdependencyWarnings = [];
+  let maxTargetScore = parseInt(clauseObj.risk_score, 10) || 5;
+  let targetLevel = clauseObj.risk_level || 'low';
+
+  for (const [term, definition] of Object.entries(symbolTable)) {
+    if (!term || typeof term !== 'string' || term.length < 3) continue;
+    const termLower = term.toLowerCase();
+
+    // Check if the defined term is referenced in this clause
+    if (lowerText.includes(termLower)) {
+      const defLower = (typeof definition === 'string' ? definition : JSON.stringify(definition)).toLowerCase();
+
+      // Check if definition contains overreaching traps
+      const isOverreachingIP = (termLower.includes('work product') || termLower.includes('invention') || termLower.includes('intellectual property')) &&
+        (defLower.includes('unrelated') || defLower.includes('children') || defLower.includes('spouse') || defLower.includes('past employer') || defLower.includes('family'));
+
+      const isOverreachingLosses = (termLower.includes('loss') || termLower.includes('indemnity') || termLower.includes('damage')) &&
+        (defLower.includes('consequential') || defLower.includes('indirect') || defLower.includes('unlimited') || defLower.includes('attorney fees'));
+
+      const isOverreachingRestrictedPeriod = (termLower.includes('restricted period') || termLower.includes('term')) &&
+        (defLower.includes('perpetual') || defLower.includes('indefinite') || defLower.includes('5 years') || defLower.includes('10 years'));
+
+      if (isOverreachingIP) {
+        interdependencyWarnings.push(`🔗 [Cross-Reference Interdependency Alert] Defined term '${term}' (Section 1) expands this clause to include assets created by family members or unrelated projects.`);
+        maxTargetScore = Math.max(maxTargetScore, 9);
+        targetLevel = 'critical';
+      }
+
+      if (isOverreachingLosses) {
+        interdependencyWarnings.push(`🔗 [Cross-Reference Interdependency Alert] Defined term '${term}' (Section 1) expands liability in this clause to include indirect & consequential damages.`);
+        maxTargetScore = Math.max(maxTargetScore, 8);
+        targetLevel = 'high';
+      }
+
+      if (isOverreachingRestrictedPeriod) {
+        interdependencyWarnings.push(`🔗 [Cross-Reference Interdependency Alert] Defined term '${term}' (Section 1) extends the restricted timeframe of this clause indefinitely.`);
+        maxTargetScore = Math.max(maxTargetScore, 8);
+        targetLevel = 'high';
+      }
+    }
+  }
+
+  if (interdependencyWarnings.length > 0) {
+    clauseObj.risk_level = targetLevel;
+    clauseObj.risk_score = maxTargetScore;
+    clauseObj.interdependency_warnings = interdependencyWarnings;
+    clauseObj.risk_reasons = [
+      ...interdependencyWarnings,
+      ...(clauseObj.risk_reasons || [])
+    ];
+    console.log(`🔗 [Interdependency Resolver] Clause ${clauseObj.id}: Risk escalated to ${targetLevel} (${maxTargetScore}) via defined term interdependency.`);
+  }
+
+  return clauseObj;
+}
+
 // ── Phase 1: Selective Reflection Loop (Self-Healing) ────────────────────────
 async function triggerReflectionLoop(clauseObj, clauseText, globalContext) {
     const { callLLM } = require('./aiClient');
@@ -535,6 +606,9 @@ ${JSON.stringify(globalContext.symbolTable || {}, null, 2)}
     const previousScore = resultObj.risk_score;
     resultObj = enforcePredatoryTrapEscalation(resultObj, clauseTextMap[baseAnalysis.id] || "");
 
+    // Cross-Reference & Defined Term Interdependency Resolution Pass
+    resultObj = resolveClausalInterdependencies(resultObj, clauseTextMap[baseAnalysis.id] || "", globalContext);
+
     // Phase 4A: Tri-Layer Trap Detection (Vector Fingerprinting + LLM Fallback)
     if (process.env.ENABLE_SEMANTIC_TRAP_DETECTION === 'true' && resultObj.risk_level !== 'critical') {
         const { detectVectorAndSemanticTraps } = require('./classifierService');
@@ -754,4 +828,4 @@ async function analyseRisksForContract(contractId) {
   );
 }
 
-module.exports = { runAgent2RiskAnalyst, analyseRisksForContract, runAdversarialJudgeBatch };
+module.exports = { runAgent2RiskAnalyst, analyseRisksForContract, runAdversarialJudgeBatch, resolveClausalInterdependencies };

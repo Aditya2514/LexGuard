@@ -62,3 +62,11 @@ backend/generate_*
 frontend/e2e_*
 backend/models/
 backend/test_sim.js
+backend/scratch/
+backend/check_*
+backend/debug_*
+backend/reprocess_contract.js
+backend/run_isolation.js
+backend/verify_embeddings.js
+backend/find_benchmark.js
+backend/.trigger_restart.txt
