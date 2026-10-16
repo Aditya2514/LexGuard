@@ -1,20 +1,18 @@
 <div align="center">
 
   <h1>🏛️ LexGuard</h1>
-  <h3>AI-Powered Legal Contract Intelligence Platform for Indian Jurisprudence</h3>
+  <h3>AI contract review for Indian law</h3>
 
   <p align="center">
-    <i>An autonomous multi-agent legal risk analyst, predatory clause auditor, and vector RAG compliance engine engineered specifically for Indian contract law.</i>
+    <i>Upload an employment, freelance or vendor contract. LexGuard splits it into clauses, rates how risky each one is for the person signing, explains it in plain language, cites the Indian statute it touches, and drafts a fairer rewrite.</i>
   </p>
 
   <p align="center">
-    <a href="#-benchmark-performance"><img src="https://img.shields.io/badge/Risk_Accuracy-100%25-brightgreen.svg?style=for-the-badge&logo=target" alt="Risk Accuracy" /></a>
-    <a href="#-benchmark-performance"><img src="https://img.shields.io/badge/Classification-100%25-brightgreen.svg?style=for-the-badge&logo=check" alt="Classification Accuracy" /></a>
-    <a href="#-rag-statutory-grounding-engine"><img src="https://img.shields.io/badge/Statutes_Ingested-7556%2B-blue.svg?style=for-the-badge&logo=mongodb" alt="Statutes Ingested" /></a>
-    <a href="#-system-architecture"><img src="https://img.shields.io/badge/Architecture-6_Agent_Pipeline-purple.svg?style=for-the-badge&logo=diagramsdotnet" alt="6-Agent Architecture" /></a>
-    <a href="#-tech-stack-matrix"><img src="https://img.shields.io/badge/React-19.0-61DAFB.svg?style=for-the-badge&logo=react" alt="React 19" /></a>
-    <a href="#-tech-stack-matrix"><img src="https://img.shields.io/badge/Backend-Node.js_Express-green.svg?style=for-the-badge&logo=nodedotjs" alt="Node.js Express" /></a>
-    <a href="#-tech-stack-matrix"><img src="https://img.shields.io/badge/Payments-Razorpay_SaaS-blueviolet.svg?style=for-the-badge&logo=razorpay" alt="Razorpay SDK" /></a>
+    <a href="https://github.com/Aditya2514/LexGuard/actions/workflows/tests.yml"><img src="https://github.com/Aditya2514/LexGuard/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License" /></a>
+    <a href="#-tech-stack-matrix"><img src="https://img.shields.io/badge/React-19-61DAFB.svg?logo=react" alt="React 19" /></a>
+    <a href="#-tech-stack-matrix"><img src="https://img.shields.io/badge/Node.js-Express-339933.svg?logo=nodedotjs" alt="Node.js + Express" /></a>
+    <a href="#️-rag-statutory-grounding-engine"><img src="https://img.shields.io/badge/MongoDB-Atlas_Vector_Search-47A248.svg?logo=mongodb" alt="MongoDB Atlas Vector Search" /></a>
   </p>
 
   <br />
@@ -27,16 +25,29 @@
 
 ---
 
+## 🧗 What Was Hard
+
+A contract reviewer that is right most of the time is easy to demo and hard to trust. Most of the work went into the parts around the LLM:
+
+- **LLMs under-rate polished traps.** A predatory clause written in calm legal language often comes back LOW. After the risk analyst and an adversarial second pass, a deterministic detector (38 hand-written trap patterns in `classifierService.js`) can force an escalation, and a reflection loop makes the model explain the trap it missed.
+- **Fitting in 512 MB.** The first host capped RAM at 512 MB. The backend runs with a 380 MB V8 heap limit, drops local embedding models after inactivity in `LOW_MEMORY_MODE`, and forces garbage collection after each job.
+- **Providers fail mid-document.** Hugging Face serverless returns 402 when free credit runs out. The AI client cascades across Gemini, Groq, Hugging Face and local Ollama instead of failing the job.
+- **Extracted text is messy.** PDFs glue section numbers onto the previous sentence (`courts.16. GOVERNING LAW`) and lose line breaks. A two-pass chunker repairs that before any model sees it, and parsing falls back from LlamaParse to `pdf-parse` to Tesseract OCR for scans.
+- **Clause IDs drift.** Letting the LLM echo clause IDs back attached results to the wrong clause, so clauses are keyed by their position in the document instead.
+
+---
+
 ## 📌 Table of Contents
 
+- [🧗 What Was Hard](#-what-was-hard)
 - [💡 Overview](#-overview)
 - [✨ Key Capabilities & Features](#-key-capabilities--features)
 - [🖼️ Product Tour & UI Showcase](#️-product-tour--ui-showcase)
 - [🏗️ System Architecture](#️-system-architecture)
 - [🤖 The 6-Agent AI Orchestration Engine](#-the-6-agent-ai-orchestration-engine)
-- [🛡️ V8 Commercial Asymmetry Engine & Safety Net](#️-v8-commercial-asymmetry-engine--safety-net)
+- [🛡️ Commercial Asymmetry Engine & Deterministic Safety Net](#️-commercial-asymmetry-engine--deterministic-safety-net)
 - [⚙️ RAG Statutory Grounding Engine](#️-rag-statutory-grounding-engine)
-- [🏆 Benchmark Performance](#-benchmark-performance)
+- [📏 Evaluation](#-evaluation)
 - [💻 Tech Stack Matrix](#-tech-stack-matrix)
 - [🚀 Quick Start & Installation](#-quick-start--installation)
 - [📡 API Endpoints Reference](#-api-endpoints-reference)
@@ -46,9 +57,9 @@
 
 ## 💡 Overview
 
-**LexGuard** is a full-stack, enterprise-grade AI legal intelligence platform built to parse, analyze, and audit complex agreements under Indian law. Designed for founders, employees, freelancers, and legal teams, LexGuard bridges the gap between legalese and plain language while surfacing high-risk commercial traps.
+**LexGuard** is a full-stack app that parses, analyzes and audits agreements under Indian law. It is built for employees, freelancers and founders who sign contracts without a lawyer, and it turns legalese into plain language while surfacing one-sided clauses.
 
-Traditional LLM wrappers suffer from statutory hallucinations, missing subtle legal loopholes, and crashing on large document streaming. LexGuard solves this through a **6-Agent Sequential Pipeline**, a **Vector Retrieval-Augmented Generation (RAG) Engine** powered by MongoDB Atlas containing 7,556+ Indian law nodes, and an unbreakable **V8 Deterministic Safety Net** featuring 18 hardcoded legal trap tripwires.
+A single LLM call misses subtle traps, cites statutes that don't exist, and falls over on long documents. LexGuard splits the job into a **sequential agent pipeline**, grounds statutory citations with **retrieval over 7,556+ Indian law sections** in MongoDB Atlas Vector Search, and backs the LLM with a **deterministic safety net** of 38 hand-written trap patterns.
 
 ---
 
@@ -171,7 +182,7 @@ graph TB
         A1["📋 Agent 1: Clause Classifier (17 Types)"]
         A2["⚠️ Agent 2: Commercial Risk Analyst"]
         A25["⚖️ Agent 2.5: Adversarial Judge"]
-        V8["🛡️ V8 Deterministic Safety Net"]
+        V8["🛡️ Deterministic Safety Net"]
         A3["💬 Agent 3: User Advocate & Drafter"]
         A4["📜 Agent 4: Geo-RAG Compliance"]
     end
@@ -209,16 +220,16 @@ LexGuard executes a multi-stage sequential agent pipeline. Each agent operates w
 | **Agent 1** | **Clause Extractor & Classifier** | Maps parsed text into discrete clauses and categorizes them across 17 legal types (Non-Compete, IP Assignment, Indemnity, Jurisdiction, etc.). | `0.1` |
 | **Agent 2** | **Risk Analyst (Asymmetry Engine)** | Performs 4-tier risk assessment (`LOW`, `MEDIUM`, `HIGH`, `CRITICAL`), calculating asymmetric leverage and potential liability. | `0.2` |
 | **Agent 2.5** | **Adversarial Judge** | Cross-examines Agent 2 outputs from a hostile employer/vendor perspective to eliminate false positives and false negatives. | `0.1` |
-| **V8** | **Deterministic Safety Net** | Scans clause text against 18 hardcoded regex patterns to trigger emergency overrides if AI misses critical traps. | `Deterministic` |
+| **Safety net** | **Deterministic Trap Detector** | Scans clause text against 38 hand-written trap patterns and escalates the rating if the AI missed or under-rated a trap. | `Deterministic` |
 | **Agent 3** | **User Advocate** | Translates legalese into plain language, details worst-case scenarios, provides negotiation advice, and drafts balanced rewrites. | `0.3` |
 | **Agent 4** | **Geo-RAG Statutory Compliance** | Queries Atlas Vector Search for statutory sections, auditing compliance against Indian laws (Contract Act, DPDP, IT Act, etc.). | `0.1` |
 | **Agent 5** | **Interactive Contract Chat** | Context-aware LLM agent allowing instant interactive Q&A over the entire contract state. | `0.4` |
 
 ---
 
-## 🛡️ V8 Commercial Asymmetry Engine & Safety Net
+## 🛡️ Commercial Asymmetry Engine & Deterministic Safety Net
 
-Standard AI risk scanners often miss legal traps disguised as standard boilerplate. LexGuard combines LLM semantic reasoning with an unbreakable **V8 Deterministic Safety Net**.
+LLM risk scanners often miss traps disguised as standard boilerplate. LexGuard runs a **deterministic safety net** after the LLM: if a known trap pattern matches, the clause cannot be rated below it.
 
 <div align="center">
   <img src="artifacts/dual_layer_defense.png" width="96%" alt="Dual Layer Defense Diagram" style="border-radius: 8px;" />
@@ -231,7 +242,7 @@ Standard AI risk scanners often miss legal traps disguised as standard boilerpla
 ```mermaid
 graph TD
     Clause["Clause Text Processing"] --> LLM["LLM Agent 2 & 2.5 Analysis"]
-    LLM --> SafetyNet{"V8 Safety Net Check\n(18 Hardcoded Regex Traps)"}
+    LLM --> SafetyNet{"Safety Net Check\n(38 Hand-Written Trap Patterns)"}
     SafetyNet -->|Trap Triggered| Override["🚨 CRITICAL Override\n(Elevates Risk & Appends Warnings)"]
     SafetyNet -->|No Hard Trap| Keep["✅ Validate LLM Severity Rating"]
 ```
@@ -273,21 +284,21 @@ graph LR
 
 ---
 
-## 🏆 Benchmark Performance
+## 📏 Evaluation
 
-LexGuard is continuously benchmarked against synthetic and real-world Indian legal contracts, including an **Adversarial Heavy Suite** of 10 hyper-obfuscated contract traps.
+These numbers come from the reports committed in [`backend/benchmark/`](backend/benchmark) (May 2026 runs). Each case is a single clause with an expected clause type and risk tier.
 
-### Calibration & Benchmark Summary
+| Suite | Cases | Clause type correct | Risk tier correct | Risky clauses rated too low |
+| :--- | :---: | :---: | :---: | :---: |
+| Master calibration | 30 | 28 (93%) | 21 (70%) | 0 |
+| Adversarial ("heavy") | 10 | 9 (90%) | 10 (100%) | 0 |
+| Ultra | 5 | 5 | 4 | 0 |
 
-| Metric / Suite | Master Calibration (30 Cases) | Stress Test (10 Adversarial Traps) |
-| :--- | :---: | :---: |
-| **Clause Classification Accuracy** | **100%** | **100%** |
-| **Risk Assessment Accuracy** | **100%** | **100%** |
-| **False Negative Rate** | **0.0%** | **0.0%** |
-| **V8 Deterministic Escalations** | N/A | **10 / 10 Successfully Intervened** |
-| **Statutory Hallucination Rate** | **0.0%** | **0.0%** |
+What these numbers do and don't say:
 
-> **Result**: Enterprise-grade auditing engine with zero blind spots for critical legal vulnerabilities.
+- **It errs toward over-flagging.** All 9 risk misses in the master suite rated a clause *more* severe than expected (HIGH → CRITICAL, or a fair safe-harbour clause → CRITICAL). It never under-rated a risky clause in these runs. That is the right direction to fail for a tool protecting the signer, but it means noise on fair contracts.
+- **I wrote the cases.** The same person wrote the test clauses and the trap patterns, so these suites catch regressions; they do not show how well LexGuard generalises to contracts it has never seen. A held-out set of real contracts is the next step.
+- **Benchmarks need live services.** `npm run benchmark` calls the LLM providers and MongoDB. The offline unit suite (`npm test`, runs in CI on every push) covers the deterministic layer: text cleaning, clause chunking, fact extraction and the cross-clause contradiction rules.
 
 ---
 
@@ -331,15 +342,10 @@ cd backend
 npm install
 ```
 
-Create a `.env` file in the `backend/` directory:
-```env
-PORT=5000
-MONGO_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/lexguard?retryWrites=true&w=majority
-JWT_SECRET=your_super_secret_jwt_key_here
-HF_TOKEN=your_huggingface_api_token
-REDIS_URL=rediss://default:your_redis_password@your_redis_host:6379
-RAZORPAY_KEY_ID=your_razorpay_key_id
-RAZORPAY_KEY_SECRET=your_razorpay_key_secret
+Copy `backend/.env.example` to `backend/.env` and fill in at least `MONGODB_URI`, `JWT_SECRET` and one LLM key (`GEMINI_API_KEY`, `GROQ_API_KEY` or `HUGGINGFACE_API_KEY`). Redis, Pinecone, Neo4j and Razorpay are optional.
+
+```bash
+cp .env.example .env
 ```
 
 ### 3. Seed Knowledge Base (Statute Nodes)
@@ -364,6 +370,13 @@ npm install
 npm run dev
 ```
 Open your browser at `http://localhost:5173`.
+
+### 6. Run the Tests
+```bash
+cd backend
+npm test            # offline unit suite, no keys needed
+npm run benchmark   # LLM benchmark suites, needs .env
+```
 
 ---
 
@@ -395,6 +408,5 @@ Open your browser at `http://localhost:5173`.
 
 <div align="center">
   <br />
-  <p><b>Built with precision for the complex realities of Indian Legal Jurisprudence.</b></p>
-  <p>© 2026 LexGuard Intelligence Platform. All rights reserved.</p>
+  <p>Released under the <a href="LICENSE">MIT License</a>. LexGuard explains contracts; it is not legal advice.</p>
 </div>

@@ -7,10 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node --max-old-space-size=380 --optimize-for-size --expose-gc src/server.js",
     "test": "node --test test/*.test.js",
-    "benchmark": "node benchmark/benchmark_runner.js --verbose",
-    "benchmark:ci": "node benchmark/benchmark_runner.js --ci --save --min-recall 85 --min-precision 90",
-    "benchmark:json": "node benchmark/benchmark_runner.js --json",
-    "benchmark:save": "node benchmark/benchmark_runner.js --verbose --save"
+    "benchmark": "node benchmark/run_all_benchmarks.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
