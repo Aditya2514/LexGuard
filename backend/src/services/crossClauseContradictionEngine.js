@@ -247,7 +247,11 @@ function detectContradictions(factTable, clauses) {
   // ── Rule 5: JURISDICTION_CONFLICT ─────────────────────────────────────────
   const jurisdictionFacts = categorizedFacts.jurisdiction || [];
   if (jurisdictionFacts.length >= 2) {
-    const uniqueJurisdictions = [...new Set(jurisdictionFacts.map(f => f.value))];
+    // "Laws of India ... courts at Mumbai" names one jurisdiction at two levels, not two
+    // competing ones: drop any jurisdiction that is an ancestor of another one named.
+    const named = new Set(jurisdictionFacts.map(f => JURISDICTION_ALIAS[f.value] || f.value));
+    const covered = new Set([...named].flatMap(jurisdictionAncestors));
+    const uniqueJurisdictions = [...named].filter(j => !covered.has(j));
     if (uniqueJurisdictions.length >= 2) {
       const clauseIndices = [...new Set(jurisdictionFacts.map(f => f.clauseIndex))];
       findings.push({
@@ -500,6 +504,22 @@ function detectContradictions(factTable, clauses) {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+const JURISDICTION_PARENT = {
+  mumbai: 'india', delhi: 'india', bengaluru: 'india', chennai: 'india',
+  kolkata: 'india', hyderabad: 'india', 'port blair': 'india',
+  'new york': 'united states', california: 'united states', delaware: 'united states',
+  texas: 'united states', illinois: 'united states', florida: 'united states',
+  massachusetts: 'united states', washington: 'united states',
+  london: 'england', england: 'united kingdom',
+};
+const JURISDICTION_ALIAS = { bangalore: 'bengaluru' };
+
+function jurisdictionAncestors(jurisdiction) {
+  const ancestors = [];
+  for (let p = JURISDICTION_PARENT[jurisdiction]; p; p = JURISDICTION_PARENT[p]) ancestors.push(p);
+  return ancestors;
+}
+
 function formatCurrency(value, unit) {
   if (unit === 'INR') {
     return '₹' + value.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
