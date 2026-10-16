@@ -83,7 +83,7 @@ A single LLM call misses subtle traps, cites statutes that don't exist, and fall
     </td>
     <td width="50%">
       <h3>🧠 MongoDB Atlas Vector RAG</h3>
-      <p>Performs 384-dimensional <code>$vectorSearch</code> queries directly at the database layer against <b>7,556+ statutory nodes</b> (Contract Act 1872, DPDP Act 2023, Copyright Act, etc.) with a rigid <code>0.82</code> similarity threshold.</p>
+      <p>Performs 384-dimensional <code>$vectorSearch</code> queries directly at the database layer against <b>7,556+ statutory nodes</b> (Contract Act 1872, DPDP Act 2023, Copyright Act, etc.) filtered by legal domain and jurisdiction, keeping matches at <code>0.70</code> similarity or above and tagging those under <code>0.80</code> as lower confidence.</p>
     </td>
   </tr>
   <tr>
@@ -267,7 +267,7 @@ graph LR
     CT["Clause Segment"] --> EMB["Generate 384-dim Embedding\n(all-MiniLM-L6-v2)"]
     EMB --> Atlas["MongoDB Atlas Vector Search\n($vectorSearch)"]
     Atlas --> Filter["LegalDomainMap Ontology Filter\n(Domain Routing)"]
-    Filter --> Match["Top 3 Matching Statutes\n(Similarity > 0.82)"]
+    Filter --> Match["Top 5 Matching Statutes\n(Similarity ≥ 0.70)"]
     Match --> Agent4["Agent 4 Compliance Verification"]
 ```
 
