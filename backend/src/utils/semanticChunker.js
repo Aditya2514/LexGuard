@@ -119,7 +119,10 @@ class SemanticChunker {
 
     for (const sentence of sentences) {
       if ((currentBlock.length + sentence.length) / 4 > this.maxTokens) {
-        subChunks.push({ text: currentBlock.trim(), type: 'overflow_block' });
+        // An oversized first sentence leaves nothing to flush; pushing it would emit an empty clause
+        if (currentBlock.trim()) {
+          subChunks.push({ text: currentBlock.trim(), type: 'overflow_block' });
+        }
         currentBlock = sentence;
       } else {
         currentBlock += " " + sentence;
