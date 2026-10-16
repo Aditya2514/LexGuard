@@ -1,4 +1,5 @@
 const { createClient } = require('redis');
+const { redactUrl } = require('../utils/redactUrl');
 
 let redisClient = null;
 let isRedisAvailable = false;
@@ -6,7 +7,7 @@ let isRedisAvailable = false;
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 if (process.env.NODE_ENV !== 'test') {
-  console.log(`🔌 Initializing Redis Client on ${redisUrl}...`);
+  console.log(`🔌 Initializing Redis Client on ${redactUrl(redisUrl)}...`);
   
   redisClient = createClient({
     url: redisUrl,
