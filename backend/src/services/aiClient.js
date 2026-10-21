@@ -647,74 +647,9 @@ function generateSmartLocalFallback(systemPrompt, userContent) {
   const getClauseInfo = (rawText = '') => {
     const text = rawText.toLowerCase();
     
-    if (text.includes('globally for an absolute and indefinite duration') || text.includes('strictly barred from working')) {
-      return { type: 'non_compete', risk: 'critical', score: 9 };
-    }
-    if (text.includes('12 months following their date of separation') || text.includes('similar line of business')) {
-      return { type: 'non_compete', risk: 'critical', score: 9 };
-    }
-    if (text.includes('exclusive jurisdiction') && text.includes('port blair')) {
-      return { type: 'dispute_resolution', risk: 'high', score: 8 };
-    }
-    if (text.includes('devote their entire working time') && text.includes('active term of employment')) {
-      return { type: 'non_compete', risk: 'low', score: 2 };
-    }
-    if (text.includes('nominate, select, and finalize the sole arbitrator') || text.includes('sole arbitrator')) {
-      return { type: 'dispute_resolution', risk: 'high', score: 8 };
-    }
-    if (text.includes('performance contingency reserve') || text.includes('permanently forfeited')) {
-      return { type: 'compensation', risk: 'critical', score: 9 };
-    }
-    if (text.includes('reversionary rights under section 19(4)')) {
-      return { type: 'intellectual_property', risk: 'high', score: 8 };
-    }
-    if (text.includes('pandemic, strike, or act of god') || text.includes('obligations to pay fees shall be suspended')) {
-      return { type: 'force_majeure', risk: 'critical', score: 9 };
-    }
-    if (text.includes('prior to the commencement of employment') && text.includes('exhibit a')) {
-      return { type: 'intellectual_property', risk: 'critical', score: 9 };
-    }
-    if (text.includes('arising entirely from the company\'s own gross negligence')) {
-      return { type: 'indemnification', risk: 'critical', score: 9 };
-    }
-    if (text.includes('payment for any work completed prior to termination') || text.includes('not yet been invoiced')) {
-      return { type: 'termination', risk: 'high', score: 8 };
-    }
-    if (text.includes('fixed penalty of inr 5,00,000') || text.includes('substantial costs for training')) {
-      return { type: 'compensation', risk: 'critical', score: 9 };
-    }
-    if (text.includes('period of 5 years') && text.includes('prospect of the company')) {
-      return { type: 'non_solicitation', risk: 'critical', score: 9 };
-    }
-    if (text.includes('unilaterally modify, reduce, or alter') && text.includes('salary, benefits')) {
-      return { type: 'compensation', risk: 'critical', score: 9 };
-    }
-    if (text.includes('state of delaware') || text.includes('wilmington, delaware')) {
-      return { type: 'dispute_resolution', risk: 'high', score: 8 };
-    }
-    if (text.includes('extend this probation period indefinitely')) {
-      return { type: 'termination', risk: 'high', score: 8 };
-    }
-    if (text.includes('claims of sexual harassment') || text.includes('confidential binding arbitration')) {
-      return { type: 'dispute_resolution', risk: 'critical', score: 9 };
-    }
-    if (text.includes('outside freelancing during weekends')) {
-      return { type: 'other', risk: 'low', score: 1 };
-    }
-    if (text.includes('reimburse the exact, pro-rated actual cost of the certification')) {
-      return { type: 'compensation', risk: 'low', score: 2 };
-    }
-    if (text.includes('normal working hours, using company equipment')) {
-      return { type: 'intellectual_property', risk: 'low', score: 2 };
-    }
-    if (text.includes('indemnifying party\'s gross negligence or willful misconduct in the performance')) {
-      return { type: 'indemnification', risk: 'low', score: 2 };
-    }
-    if (text.includes('unpaid disciplinary suspension') || text.includes('pending any internal investigation')) {
-      return { type: 'other', risk: 'critical', score: 9 };
-    }
+    // (Removed Oct 2026: per-case branches that matched benchmark/dataset*.json clause text verbatim.)
 
-    // Default heuristics if not matching any benchmark case:
+    // Keyword heuristics:
     let type = 'other';
     if (text.includes('compete') || text.includes('competing') || text.includes('non-compete')) {
       type = 'non_compete';

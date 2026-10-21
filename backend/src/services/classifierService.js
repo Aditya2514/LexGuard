@@ -6,8 +6,8 @@
  * to detect specific predatory mechanisms that LLMs consistently under-rate
  * because of polished legal language.
  * 
- * Design philosophy: High precision (no false positives) > High recall.
- * Each pattern requires 3-4 simultaneous keyword hits to fire.
+ * Design goal: precision over recall. Most patterns AND together 2-3 keyword
+ * groups; a few fire on a single keyword group and can over-flag.
  * 
  * Returns objects with { type, severity } so the escalation layer can
  * distinguish CRITICAL-level traps from HIGH-level traps.
@@ -131,14 +131,8 @@ function detectPredatoryTraps(text) {
     // CRITICAL-SEVERITY PATTERNS (force escalation to risk_level=critical)
     // ═══════════════════════════════════════════════════════════════════════
     
-    // ── Pattern 0: Benchmark Traps ──────────────────────────────
-    if (lower.includes('12 months following their date of separation') || lower.includes('similar line of business')) {
-        detectedTraps.push({ type: 'disguised non-compete', severity: 'critical' });
-    }
-    if (lower.includes('exclusive jurisdiction') && lower.includes('port blair')) {
-        detectedTraps.push({ type: 'predatory jurisdiction', severity: 'high' });
-    }
-    
+    // (Removed Oct 2026: two rules whose triggers were copied verbatim from benchmark/dataset_ultra.json text.)
+
     // ── Pattern 1: Unilateral Force Majeure ──────────────────────────────
     const hasForceMajeureTrigger = (
         lower.includes('force majeure') || 
@@ -432,12 +426,12 @@ function detectPredatoryTraps(text) {
 
     // ── Pattern 12: Indefinite Probation ─────────────────────────────────
     const hasProbation = lower.includes('probation');
+    // An open-ended extension is the trap on its own; a third condition here used to require one benchmark clause's exact wording
     const hasIndefiniteExtension = (
-        lower.includes('extend this probation period indefinitely') || 
-        lower.includes('extend indefinitely')
+        lower.includes('extend indefinitely') ||
+        /probation[^.]{0,120}indefinite|indefinite[^.]{0,40}probation/.test(lower)
     );
-    const hasTerminationWithoutCause = lower.includes('terminated without notice or cause');
-    if (hasProbation && hasIndefiniteExtension && hasTerminationWithoutCause) {
+    if (hasProbation && hasIndefiniteExtension) {
         detectedTraps.push({ type: 'indefinite probation trap', severity: 'high' });
     }
     // ── Pattern 14: Unconscionable Surveillance / Privacy Waiver ─────────
