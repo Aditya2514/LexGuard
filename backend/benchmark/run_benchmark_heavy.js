@@ -56,7 +56,8 @@ async function runJudgeOnRewrite(originalText, suggestedRewrite, riskLevel) {
   `;
 
   try {
-    const scoreText = await callLLM({ systemPrompt: JUDGE_PROMPT, userPrompt, temperature: 0.0 });
+    // callLLM reads `userContent`, and its default jsonMode parses the reply, so ask for plain text
+    const scoreText = String(await callLLM({ systemPrompt: JUDGE_PROMPT, userContent: userPrompt, jsonMode: false, temperature: 0.0 }));
     
     // Use a regex to look for any standalone number between 1 and 10 in the response
     const match = scoreText.match(/\b([1-9]|10)\b/);
