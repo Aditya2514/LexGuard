@@ -5,8 +5,8 @@
  * ║  Tests: 15 edge cases across all 3 agents + orchestrator resilience    ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
-require('dotenv').config();
-const { callLLM } = require('./src/services/aiClient.js');
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const { callLLM } = require('../../src/services/aiClient.js');
 
 // ══════════════════════════════════════════════════════════════════════════════
 // PRODUCTION SYSTEM PROMPTS (exact copies from agents)

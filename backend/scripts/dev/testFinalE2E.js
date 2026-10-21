@@ -1,8 +1,8 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
-const { processContractJob } = require('./src/services/jobQueueService');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
+const { processContractJob } = require('../../src/services/jobQueueService');
 
 async function runFinalE2ETest() {
     try {
@@ -33,7 +33,7 @@ async function runFinalE2ETest() {
         });
 
         // Split text into clauses manually for the test
-        const { splitClauses } = require('./src/services/clauseSplitter');
+        const { splitClauses } = require('../../src/services/clauseSplitter');
         const textClauses = splitClauses(mockContractText);
         
         for (const tc of textClauses) {

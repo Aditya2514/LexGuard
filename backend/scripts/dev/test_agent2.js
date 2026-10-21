@@ -1,6 +1,6 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const { analyseRisksForContract } = require('./src/services/agent2RiskAnalyst');
+const { analyseRisksForContract } = require('../../src/services/agent2RiskAnalyst');
 
 (async () => {
   try {

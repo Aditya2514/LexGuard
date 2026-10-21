@@ -1,8 +1,8 @@
 const assert = require('assert');
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { runAdversarialJudge } = require('./src/services/agent2RiskAnalyst');
+const { runAdversarialJudge } = require('../../src/services/agent2RiskAnalyst');
 
 async function runJudgeTestSuite() {
   console.log("══ INITIALIZING ASYMMETRIC JUDGE TEST SUITE ════");

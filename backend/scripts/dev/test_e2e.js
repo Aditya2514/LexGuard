@@ -3,7 +3,7 @@
  * Run: node test_e2e.js  (requires Node 18+ and live server on port 5001)
  */
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const fs   = require('fs');
 const path = require('path');
 const JSZip = require('jszip');

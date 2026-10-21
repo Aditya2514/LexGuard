@@ -7,10 +7,10 @@ async function runTest() {
   process.env.MONGODB_URI = 'mongodb://127.0.0.1:27017/lexguard_test';
   process.env.LLAMA_CLOUD_API_KEY = 'dummy';
   
-  const app = require('./src/server'); 
+  const app = require('../../src/server'); 
   await new Promise(r => setTimeout(r, 2000));
   
-  const User = require('./src/models/User');
+  const User = require('../../src/models/User');
   let user = await User.findOne({ email: 'test@example.com' });
   if (!user) {
     user = await User.create({ email: 'test@example.com', passwordHash: '123' });

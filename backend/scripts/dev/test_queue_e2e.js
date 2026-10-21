@@ -1,12 +1,12 @@
 const mongoose = require('mongoose');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
-const QueueJob = require('./src/models/QueueJob');
-const jobQueueService = require('./src/services/jobQueueService');
-const safeRedis = require('./src/config/redisClient');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
+const QueueJob = require('../../src/models/QueueJob');
+const jobQueueService = require('../../src/services/jobQueueService');
+const safeRedis = require('../../src/config/redisClient');
 
 async function runTestQueueE2E() {
   const uri = process.env.MONGODB_URI;

@@ -1,6 +1,6 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const QueueJob = require('./src/models/QueueJob');
+const QueueJob = require('../../src/models/QueueJob');
 
 async function check() {
   await mongoose.connect(process.env.MONGODB_URI);

@@ -9,7 +9,7 @@
  */
 
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
 // ── Test Utilities ───────────────────────────────────────────────────────────
 
@@ -38,7 +38,7 @@ function printGroup(title) {
 async function testCompoundIndexes() {
   printGroup('GROUP 1: Compound Database Indexes');
 
-  const Clause = require('./src/models/Clause');
+  const Clause = require('../../src/models/Clause');
 
   // Connect to MongoDB
   await mongoose.connect(process.env.MONGODB_URI);
@@ -247,7 +247,7 @@ async function testOcrFallbackService() {
   const {
     LOW_TEXT_DENSITY_THRESHOLD,
     isTesseractAvailable,
-  } = require('./src/services/ocrFallbackService');
+  } = require('../../src/services/ocrFallbackService');
 
   // Verify threshold constant
   assert(`LOW_TEXT_DENSITY_THRESHOLD is 100`, LOW_TEXT_DENSITY_THRESHOLD === 100);
@@ -276,7 +276,7 @@ async function testOcrFallbackService() {
 function testParserServiceThreshold() {
   printGroup('GROUP 4: Parser Service Threshold Logic');
 
-  const { LOW_TEXT_DENSITY_THRESHOLD } = require('./src/services/ocrFallbackService');
+  const { LOW_TEXT_DENSITY_THRESHOLD } = require('../../src/services/ocrFallbackService');
 
   // Simulate the threshold check from parserService.js
   function shouldTriggerOcr(rawText) {

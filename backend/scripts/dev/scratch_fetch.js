@@ -1,9 +1,9 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
 
 async function test() {
   await mongoose.connect(process.env.MONGODB_URI);
-  const Clause = require('./src/models/Clause.js');
+  const Clause = require('../../src/models/Clause.js');
   
   // Find clauses for the contract we just uploaded
   const clauses = await Clause.find({ contractId: '6a0b1e43abbf9fbd1ef9c94c' }).sort({ segmentIndex: 1 });

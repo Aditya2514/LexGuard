@@ -8,10 +8,10 @@ async function runTest() {
   process.env.LLAMA_CLOUD_API_KEY = 'dummy';
   process.env.PORT = '5002'; // use different port to avoid conflicts
   
-  const app = require('./src/server'); 
+  const app = require('../../src/server'); 
   await new Promise(r => setTimeout(r, 2000));
   
-  const User = require('./src/models/User');
+  const User = require('../../src/models/User');
   let user = await User.findOne({ email: 'test@example.com' });
   if (!user) {
     user = await User.create({ email: 'test@example.com', passwordHash: '123' });

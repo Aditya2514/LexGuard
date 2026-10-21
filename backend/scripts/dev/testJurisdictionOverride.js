@@ -1,8 +1,8 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
-const { enforceJurisdictionOverrides } = require('./src/services/jurisdictionOverrideService');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
+const { enforceJurisdictionOverrides } = require('../../src/services/jurisdictionOverrideService');
 
 async function testJurisdictionOverride() {
     try {

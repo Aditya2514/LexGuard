@@ -2,11 +2,11 @@
  * Quick sanity check for Gemini AI client + Agent 1 + Agent 2.
  * Run: node test_agents.js
  */
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
-const { callLLM } = require('./src/services/aiClient');
-const { runAgent1ClauseExtractor } = require('./src/services/agent1ClauseExtractor');
-const { runAgent2RiskAnalyst } = require('./src/services/agent2RiskAnalyst');
+const { callLLM } = require('../../src/services/aiClient');
+const { runAgent1ClauseExtractor } = require('../../src/services/agent1ClauseExtractor');
+const { runAgent2RiskAnalyst } = require('../../src/services/agent2RiskAnalyst');
 
 const testClauses = [
   {

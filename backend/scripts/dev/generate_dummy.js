@@ -47,6 +47,6 @@ const CONTRACT_PARAS = [
 
 (async () => {
   const buf = await makeDocx(CONTRACT_PARAS);
-  fs.writeFileSync('test_contract.docx', buf);
+  fs.writeFileSync(require('path').join(__dirname, 'test_contract.docx'), buf);
   console.log('Saved test_contract.docx');
 })();

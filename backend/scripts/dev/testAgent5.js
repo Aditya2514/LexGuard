@@ -1,9 +1,9 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const { runAgent5LifecycleExtractor } = require('./src/services/agent5LifecycleExtractor');
-const { checkUpcomingEvents } = require('./src/services/schedulerService');
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
+const { runAgent5LifecycleExtractor } = require('../../src/services/agent5LifecycleExtractor');
+const { checkUpcomingEvents } = require('../../src/services/schedulerService');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
 
 async function testAgent5() {
     try {

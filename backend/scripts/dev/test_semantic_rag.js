@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-const { retrieveRelevantLaws } = require('./src/services/lawRetrieverService');
-const LawSection = require('./src/models/LawSection');
+const { retrieveRelevantLaws } = require('../../src/services/lawRetrieverService');
+const LawSection = require('../../src/models/LawSection');
 
 async function runTestSemanticRAG() {
   const uri = process.env.MONGODB_URI;

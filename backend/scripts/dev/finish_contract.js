@@ -1,11 +1,11 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
-const { classifyClausesForContract } = require('./src/services/agent1ClauseExtractor');
-const { analyseRisksForContract } = require('./src/services/agent2RiskAnalyst');
-const { generateUserAdvocateForContract } = require('./src/services/agent3UserAdvocate');
-const { runComplianceCheckForContract } = require('./src/services/agent4ComplianceChecker');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
+const { classifyClausesForContract } = require('../../src/services/agent1ClauseExtractor');
+const { analyseRisksForContract } = require('../../src/services/agent2RiskAnalyst');
+const { generateUserAdvocateForContract } = require('../../src/services/agent3UserAdvocate');
+const { runComplianceCheckForContract } = require('../../src/services/agent4ComplianceChecker');
 
 (async () => {
   try {

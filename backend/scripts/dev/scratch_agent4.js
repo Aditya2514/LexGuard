@@ -1,5 +1,5 @@
-require('dotenv').config();
-const { runAgent4ComplianceChecker } = require('./src/services/agent4ComplianceChecker.js');
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const { runAgent4ComplianceChecker } = require('../../src/services/agent4ComplianceChecker.js');
 
 async function test() {
   const clausesBatch = [{

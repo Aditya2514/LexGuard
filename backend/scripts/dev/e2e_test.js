@@ -4,9 +4,9 @@ const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
 const FormData = require('form-data');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 
-const app = require('./src/server');
+const app = require('../../src/server');
 
 const PORT = 7866;
 const BASE_URL = `http://localhost:${PORT}`;
@@ -35,7 +35,7 @@ async function runE2E() {
         console.log('📤 Uploading dummy.docx for analysis...');
         
         const form = new FormData();
-        form.append('file', fs.createReadStream('dummy.docx'));
+        form.append('file', fs.createReadStream(path.join(__dirname, 'dummy.docx')));
         form.append('title', 'E2E Asymmetric NDA');
         form.append('contractCategory', 'employment');
 

@@ -1,6 +1,6 @@
 const assert = require('assert');
-require('dotenv').config();
-const { runAdversarialJudge } = require('./src/services/agent2RiskAnalyst');
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const { runAdversarialJudge } = require('../../src/services/agent2RiskAnalyst');
 
 async function runFinalJudgeTestSuite() {
   console.log("══ INITIALIZING ULTIMATE FINAL JUDGE TEST SUITE ════\n");

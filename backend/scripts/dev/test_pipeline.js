@@ -6,8 +6,8 @@
  * Run: node test_pipeline.js
  */
 
-const { cleanText } = require('./src/services/textCleaner');
-const { splitClauses } = require('./src/services/clauseSplitter');
+const { cleanText } = require('../../src/services/textCleaner');
+const { splitClauses } = require('../../src/services/clauseSplitter');
 const path = require('path');
 const fs = require('fs');
 

@@ -4,8 +4,8 @@
  * Run: node test_phase1.js
  */
 
-const { cleanText } = require('./src/services/textCleaner');
-const { splitClauses } = require('./src/services/clauseSplitter');
+const { cleanText } = require('../../src/services/textCleaner');
+const { splitClauses } = require('../../src/services/clauseSplitter');
 
 let passed = 0;
 let failed = 0;

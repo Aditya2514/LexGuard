@@ -1,21 +1,21 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const mongoose = require('mongoose');
 const crypto = require('crypto');
 const http = require('http');
 
 // Models
-const Contract = require('./src/models/Contract');
-const Clause = require('./src/models/Clause');
-const Webhook = require('./src/models/Webhook');
-const User = require('./src/models/User');
+const Contract = require('../../src/models/Contract');
+const Clause = require('../../src/models/Clause');
+const Webhook = require('../../src/models/Webhook');
+const User = require('../../src/models/User');
 
 // Services
-const { dispatchWebhooks } = require('./src/services/webhookDispatcher');
-const { runAdversaryRedTeamForContract } = require('./src/services/agent6Adversary');
-const { callLLM } = require('./src/services/aiClient');
+const { dispatchWebhooks } = require('../../src/services/webhookDispatcher');
+const { runAdversaryRedTeamForContract } = require('../../src/services/agent6Adversary');
+const { callLLM } = require('../../src/services/aiClient');
 
 // Since runAgent2RiskAnalyst is not exported, we will test the trap detection natively.
-const { detectPredatoryTraps } = require('./src/services/classifierService');
+const { detectPredatoryTraps } = require('../../src/services/classifierService');
 
 async function testEnterpriseV7() {
   console.log('🚀 Starting Enterprise V7 Architecture Test Suite...');

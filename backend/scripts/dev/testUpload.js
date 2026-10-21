@@ -7,7 +7,7 @@ fs.writeFileSync('dummy.pdf', 'dummy content');
 
 async function testUpload() {
   try {
-    const { extractText } = require('./src/services/parserService');
+    const { extractText } = require('../../src/services/parserService');
     const GridFsStorage = require('multer-gridfs-storage').GridFsStorage;
     const { GridFSBucket } = mongoose.mongo;
     
@@ -29,7 +29,7 @@ async function testUpload() {
     console.log('Dummy file uploaded to GridFS with ID:', fileId);
     
     // Override getFileStream temporarily
-    const gridFsStorageModule = require('./src/services/gridFsStorage');
+    const gridFsStorageModule = require('../../src/services/gridFsStorage');
     // Ensure gfsBucket is initialized in the module by faking an 'open' event or calling connect
     // Wait, the module hooks into mongoose.connection.once('open'), so it should be initialized now!
     // But since mongoose.connect was called BEFORE requiring gridFsStorage, the 'open' event might have already fired!

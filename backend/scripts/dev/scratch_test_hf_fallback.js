@@ -1,8 +1,8 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 process.env.HUGGINGFACE_API_KEY = 'invalid_key';
 process.env.LLM_PROVIDER = 'huggingface';
 
-const { callLLM } = require('./src/services/aiClient.js');
+const { callLLM } = require('../../src/services/aiClient.js');
 
 async function testFallback() {
   console.log("Testing Hugging Face Integration with forced error...");

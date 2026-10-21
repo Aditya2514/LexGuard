@@ -1,5 +1,5 @@
 const fs = require('fs');
-const file = 'backend/src/services/agent2RiskAnalyst.js';
+const file = require('path').join(__dirname, '../../src/services/agent2RiskAnalyst.js');
 let content = fs.readFileSync(file, 'utf8');
 
 const judgePrompt = `

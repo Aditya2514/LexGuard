@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const BASE_URL = 'http://localhost:5173';
-const DOCX_PATH = path.join(__dirname, '../backend/test_contract.docx');
+const DOCX_PATH = path.join(__dirname, '../backend/scripts/dev/test_contract.docx');
 const SCREENSHOT_DIR = path.join(__dirname, '../artifacts');
 
 if (!fs.existsSync(SCREENSHOT_DIR)) {
