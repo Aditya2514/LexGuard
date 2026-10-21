@@ -58,26 +58,6 @@ class SemanticCitationVerifier {
   }
 }
 
-    // Cross-Encoders take the query (modern summary) and document (archaic statute)
-    const inputs = await this.tokenizer(modernSummary, { text_pair: archaicStatute, padding: true, truncation: true });
-    const { logits } = await this.model(inputs);
-    
-    // Extract raw logit score
-    const logitScore = logits.data[0];
-
-    // Normalize logit into a rough 0-1 score for thresholding. 
-    // bge-reranker logits usually range from -10 to +3.
-    // We apply a shifted sigmoid to make the math work for a 0.65 threshold.
-    const normalizedScore = 1 / (1 + Math.exp(-(logitScore + 7.5))); 
-
-    console.log(`[Verifier] Semantic Cross-Encoder Score: ${normalizedScore.toFixed(3)} (Raw Logit: ${logitScore.toFixed(3)})`);
-
-    const SEMANTIC_THRESHOLD = 0.65; 
-
-    return normalizedScore >= SEMANTIC_THRESHOLD;
-  }
-}
-
 const semanticVerifier = new SemanticCitationVerifier();
 
 // ── Citation Format Normalizer ───────────────────────────────────────────────

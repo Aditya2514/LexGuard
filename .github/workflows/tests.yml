@@ -19,6 +19,10 @@ jobs:
         with:
           node-version: 20
 
+      # Catches files that cannot even be parsed (a stray method body once broke citation verification for months)
+      - name: Syntax-check every backend source file
+        run: find src -name '*.js' -print0 | xargs -0 -n1 node --check
+
       # The unit suite covers the deterministic layer only (no DB, no LLM keys),
       # so it runs without installing the backend's heavy dependencies.
       - name: Run unit tests
